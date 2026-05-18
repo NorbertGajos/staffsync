@@ -71,6 +71,14 @@ export interface Attendance {
   note: string | null
 }
 
+export interface StanowiskoType {
+  id: string
+  nazwa: string
+  kolejnosc: number
+  aktywne: boolean
+}
+
+// Fallback – używany gdy baza nie odpowie
 export const STANOWISKA = [
   'Ratownik',
   'Instruktor Wakeboard',
@@ -90,6 +98,6 @@ export const STANOWISKA = [
 
 export const MONTHS = [
   { label: 'Czerwiec 2026', month: 6, year: 2026, days: 30 },
-  { label: 'Lipiec 2026', month: 7, year: 2026, days: 30 },
-  { label: 'Sierpień 2026', month: 8, year: 2026, days: 30 },
+  { label: 'Lipiec 2026', month: 7, year: 2026, days: 31 },
+  { label: 'Sierpień 2026', month: 8, year: 2026, days: 31 },
 ] as const
