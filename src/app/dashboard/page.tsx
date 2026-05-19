@@ -8,6 +8,7 @@ import { Profile } from '@/lib/types'
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [notifStatus, setNotifStatus] = useState<'unknown' | 'granted' | 'denied' | 'loading'>('unknown')
   const router = useRouter()
   const supabase = createClient()
 
@@ -20,11 +21,32 @@ export default function DashboardPage() {
       setLoading(false)
     }
     loadProfile()
+
+    // Sprawdź status powiadomień
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifStatus(Notification.permission as any)
+    }
   }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  async function enableNotifications() {
+    if (!profile) return
+    setNotifStatus('loading')
+    try {
+      const { requestNotificationPermission } = await import('@/lib/firebase')
+      const token = await requestNotificationPermission(profile.id)
+      if (token) {
+        setNotifStatus('granted')
+      } else {
+        setNotifStatus('denied')
+      }
+    } catch (e) {
+      setNotifStatus('denied')
+    }
   }
 
   if (loading) return (
@@ -59,11 +81,27 @@ export default function DashboardPage() {
 
         <div style={{ background:'white', borderRadius:'22px', padding:'28px', marginBottom:'20px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <h2 style={{ color:'#064d61', margin:'0 0 8px', fontSize:'22px' }}>Witaj, {profile?.first_name}! 👋</h2>
-          <p style={{ color:'#6b8a95', margin:0, fontSize:'14px' }}>
+          <p style={{ color:'#6b8a95', margin:'0 0 16px', fontSize:'14px' }}>
             Rola: <strong style={{ color:'#0a6e8a' }}>{profile?.role}</strong>
             {profile?.stanowisko && ` · Stanowisko: `}
             {profile?.stanowisko && <strong style={{ color:'#0a6e8a' }}>{profile.stanowisko}</strong>}
           </p>
+
+          {/* POWIADOMIENIA */}
+          {notifStatus === 'unknown' && (
+            <button onClick={enableNotifications} style={{ background:'#0a6e8a', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor:'pointer', fontSize:'13px', fontWeight:600 }}>
+              🔔 Włącz powiadomienia
+            </button>
+          )}
+          {notifStatus === 'loading' && (
+            <div style={{ fontSize:'13px', color:'#6b8a95' }}>⏳ Włączanie powiadomień...</div>
+          )}
+          {notifStatus === 'granted' && (
+            <div style={{ fontSize:'13px', color:'#2d9e6b', fontWeight:600 }}>✅ Powiadomienia włączone</div>
+          )}
+          {notifStatus === 'denied' && (
+            <div style={{ fontSize:'13px', color:'#e8604c' }}>❌ Powiadomienia zablokowane – zezwól w ustawieniach przeglądarki</div>
+          )}
         </div>
 
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'16px' }}>
