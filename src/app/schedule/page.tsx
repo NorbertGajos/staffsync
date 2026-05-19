@@ -42,6 +42,7 @@ export default function SchedulePage() {
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       setProfile(prof)
       setIsAdmin(prof?.role === 'administrator' || prof?.role === 'koordynator')
+      if (prof?.role === 'pracownik') { router.push('/panel'); return }
       await loadData(0)
       setLoading(false)
     }
@@ -144,7 +145,6 @@ export default function SchedulePage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
 
-      {/* POPUP EDYCJI ZMIANY */}
       {popup && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
           <div style={{ background:'white', borderRadius:'20px', padding:'28px', width:'320px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
@@ -184,7 +184,6 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* HEADER */}
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>← Wróć</button>
         <div>
@@ -193,18 +192,12 @@ export default function SchedulePage() {
         </div>
         {isAdmin && (
           <div style={{ marginLeft:'auto', display:'flex', gap:'8px', flexWrap:'wrap' }}>
-            <button
-              onClick={() => generateSchedule(false)}
-              disabled={generating}
-              style={{ background: generating?'#6b8a95':'#2d9e6b', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}
-            >
+            <button onClick={() => generateSchedule(false)} disabled={generating}
+              style={{ background: generating?'#6b8a95':'#2d9e6b', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
               {generating ? '⏳ Generuję...' : '🤖 Generuj grafik'}
             </button>
-            <button
-              onClick={() => { if(confirm('Usunąć obecny grafik i wygenerować od nowa?')) generateSchedule(true) }}
-              disabled={generating}
-              style={{ background:'transparent', border:'1.5px solid rgba(255,255,255,0.4)', color:'white', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}
-            >
+            <button onClick={() => { if(confirm('Usunąć obecny grafik i wygenerować od nowa?')) generateSchedule(true) }} disabled={generating}
+              style={{ background:'transparent', border:'1.5px solid rgba(255,255,255,0.4)', color:'white', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
               🔄 Od nowa
             </button>
           </div>
@@ -213,7 +206,6 @@ export default function SchedulePage() {
 
       <div style={{ padding:'20px', maxWidth:'1200px', margin:'0 auto' }}>
 
-        {/* WYNIK GENEROWANIA */}
         {genResult && (
           <div style={{ background: genResult.error?'#fff0ee':'#d5f5e3', border:`1px solid ${genResult.error?'#e8604c':'#2d9e6b'}`, borderRadius:'14px', padding:'16px 20px', marginBottom:'16px' }}>
             {genResult.error ? (
@@ -233,7 +225,6 @@ export default function SchedulePage() {
           </div>
         )}
 
-        {/* MONTH TABS */}
         <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
           {MONTHS.map((mo,i) => (
             <button key={i} onClick={()=>switchMonth(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
@@ -242,7 +233,6 @@ export default function SchedulePage() {
           ))}
         </div>
 
-        {/* LEGENDA */}
         <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', marginBottom:'16px', fontSize:'12px' }}>
           {[
             { bg:'#0a6e8a', label:'Zmiana przypisana' },
@@ -257,7 +247,6 @@ export default function SchedulePage() {
           ))}
         </div>
 
-        {/* TABELA */}
         <div style={{ background:'white', borderRadius:'22px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)', overflow:'auto' }}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'600px' }}>
             <thead>
@@ -302,17 +291,17 @@ export default function SchedulePage() {
                         let content = ''
                         let fontSize = '9px'
                         if (hasAvail && !hasShift) {
-  const av = availability[w.id]?.[day]
-  bg = we?'#fdd68a':'#eef4fb'
-  color = we?'#7a5c00':'#0a6e8a'
-  if (av?.all_day === false && av?.from_time) {
-    content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
-    fontSize = '8px'
-  } else {
-    content = '✓'
-    fontSize = '12px'
-  }
-}
+                          const av = availability[w.id]?.[day]
+                          bg = we?'#fdd68a':'#eef4fb'
+                          color = we?'#7a5c00':'#0a6e8a'
+                          if (av?.all_day === false && av?.from_time) {
+                            content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
+                            fontSize = '8px'
+                          } else {
+                            content = '✓'
+                            fontSize = '12px'
+                          }
+                        }
                         if (hasShift) { bg = '#0a6e8a'; color = 'white'; content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`; fontSize = '8px' }
                         if (isSel) { bg = hasShift ? '#064d61' : (hasAvail ? (we?'#f5a623':'#1a9bb8') : (we?'#fdd68a':'#e8f0f8')) }
                         return (
@@ -332,7 +321,6 @@ export default function SchedulePage() {
           </table>
         </div>
 
-        {/* PODSUMOWANIE DNIA */}
         {selectedDay && (
           <div style={{ background:'white', borderRadius:'22px', padding:'20px', marginTop:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
             <h3 style={{ margin:'0 0 14px', color:'#064d61', fontSize:'16px' }}>📋 {selectedDay} {m.label} – {PL_DAYS[getDow(monthIdx, selectedDay)]}</h3>
@@ -362,7 +350,7 @@ export default function SchedulePage() {
                 })}
               </div>
             </div>
-          </div> 
+          </div>
         )}
       </div>
     </div>
