@@ -32,6 +32,7 @@ export default function SchedulePage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState<any>(null)
+  const [stanowiska, setStanowiska] = useState<string[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -69,6 +70,8 @@ export default function SchedulePage() {
       shMap[s.user_id][parseInt(s.date.split('-')[2])] = s
     })
     setShifts(shMap)
+    const { data: stan } = await supabase.from('stanowiska').select('nazwa').eq('aktywne', true).order('kolejnosc')
+    setStanowiska(stan?.map(s => s.nazwa) || [])
   }
 
   async function switchMonth(mi: number) {
@@ -154,8 +157,11 @@ export default function SchedulePage() {
             </p>
             <div style={{ marginBottom:'12px' }}>
               <label style={{ display:'block', fontSize:'11px', fontWeight:600, color:'#6b8a95', textTransform:'uppercase' as const, marginBottom:'4px' }}>Stanowisko</label>
-              <input value={popupStan} onChange={e => setPopupStan(e.target.value)} placeholder="np. Ratownik"
-                style={{ width:'100%', padding:'10px', border:'2px solid #ddeaf0', borderRadius:'10px', fontSize:'14px', color:'#1a2c35', outline:'none', boxSizing:'border-box' as const }} />
+              <select value={popupStan} onChange={e => setPopupStan(e.target.value)}
+                style={{ width:'100%', padding:'10px', border:'2px solid #ddeaf0', borderRadius:'8px', fontSize:'14px', color:'#1a2c35', outline:'none' }}>
+                <option value=''>— wybierz stanowisko —</option>
+                {stanowiska.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'20px' }}>
               <div>
