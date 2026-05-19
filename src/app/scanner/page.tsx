@@ -17,21 +17,30 @@ export default function ScannerPage() {
   const [processing, setProcessing] = useState(false)
   const [mounted, setMounted] = useState(false)
   const scannerRef = useRef<any>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
     return () => {
-      try {
-        if (scannerRef.current) {
-          scannerRef.current.clear()
-        }
-      } catch (e) {}
+      stopScanner()
     }
   }, [])
 
   async function startScanner() {
     setError('')
+
+    // Najpierw poproś o uprawnienia do kamery
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      })
+      stream.getTracks().forEach(t => t.stop())
+    } catch (e) {
+      setError('Brak dostępu do kamery. Zezwól na użycie kamery w ustawieniach.')
+      return
+    }
+
     setScanning(true)
     await new Promise(resolve => setTimeout(resolve, 300))
 
@@ -39,7 +48,17 @@ export default function ScannerPage() {
       const { Html5QrcodeScanner } = await import('html5-qrcode')
       scannerRef.current = new Html5QrcodeScanner(
         'qr-reader',
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          showTorchButtonIfSupported: true,
+          useBarCodeDetectorIfSupported: true,
+          rememberLastUsedCamera: true,
+          videoConstraints: {
+            facingMode: { ideal: 'environment' }
+          }
+        },
         false
       )
       scannerRef.current.render(
@@ -62,7 +81,7 @@ export default function ScannerPage() {
         (_err: any) => {}
       )
     } catch (e) {
-      setError('Błąd uruchamiania skanera')
+      setError('Błąd uruchamiania skanera. Spróbuj odświeżyć stronę.')
       setScanning(false)
     }
   }
@@ -85,29 +104,19 @@ export default function ScannerPage() {
     const time = today.toTimeString().slice(0, 5)
 
     const { data: existing } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('user_id', data.userId)
-      .eq('date', date)
-      .single()
+      .from('attendance').select('*')
+      .eq('user_id', data.userId).eq('date', date).single()
 
     if (!existing) {
       await supabase.from('attendance').insert({
-        user_id: data.userId,
-        date,
-        actual_start: time,
-        status: 'obecny',
+        user_id: data.userId, date, actual_start: time, status: 'obecny',
       })
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkin', time })
     } else if (!existing.actual_end) {
-      await supabase.from('attendance')
-        .update({ actual_end: time })
-        .eq('id', existing.id)
+      await supabase.from('attendance').update({ actual_end: time }).eq('id', existing.id)
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkout', time })
     } else {
-      await supabase.from('attendance')
-        .update({ actual_start: time, actual_end: null, status: 'obecny' })
-        .eq('id', existing.id)
+      await supabase.from('attendance').update({ actual_start: time, actual_end: null, status: 'obecny' }).eq('id', existing.id)
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkin', time })
     }
 
@@ -153,7 +162,7 @@ export default function ScannerPage() {
       )}
 
       {error && (
-        <div style={{ background:'#fff0ee', border:'2px solid #e8604c', borderRadius:'14px', padding:'14px 20px', marginBottom:'16px', color:'#e8604c', fontSize:'14px', fontWeight:600 }}>
+        <div style={{ background:'#fff0ee', border:'2px solid #e8604c', borderRadius:'14px', padding:'14px 20px', marginBottom:'16px', color:'#e8604c', fontSize:'14px', fontWeight:600, maxWidth:'400px', width:'100%', textAlign:'center' }}>
           ❌ {error}
         </div>
       )}
@@ -163,8 +172,11 @@ export default function ScannerPage() {
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:'64px', marginBottom:'16px' }}>📷</div>
             <h3 style={{ margin:'0 0 8px', color:'#064d61', fontSize:'18px' }}>Gotowy do skanowania</h3>
-            <p style={{ margin:'0 0 20px', color:'#6b8a95', fontSize:'13px' }}>
-              Kliknij aby uruchomić kamerę i skanować QR kody pracowników
+            <p style={{ margin:'0 0 8px', color:'#6b8a95', fontSize:'13px' }}>
+              Kliknij aby uruchomić kamerę tylną i skanować QR kody
+            </p>
+            <p style={{ margin:'0 0 20px', color:'#f5a623', fontSize:'12px', fontWeight:600 }}>
+              ⚠️ Na iPhone: użyj Safari i zezwól na dostęp do kamery
             </p>
             <button
               onClick={startScanner}
