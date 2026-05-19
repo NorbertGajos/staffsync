@@ -36,25 +36,9 @@ export default function ScannerPage() {
       const html5QrCode = new Html5Qrcode('qr-reader')
       scannerRef.current = html5QrCode
 
-      const cameras = await Html5Qrcode.getCameras()
-      if (!cameras || cameras.length === 0) {
-        setError('Nie znaleziono kamery')
-        setScanning(false)
-        return
-      }
-
-      // Użyj tylnej kamery jeśli dostępna
-      const backCamera = cameras.find(c =>
-        c.label.toLowerCase().includes('back') ||
-        c.label.toLowerCase().includes('rear') ||
-        c.label.toLowerCase().includes('environment') ||
-        c.label.toLowerCase().includes('tylna')
-      )
-      const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id
-
       await html5QrCode.start(
-        cameraId,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 300, height: 300 }, aspectRatio: 1.333 },
         async (decodedText) => {
           if (processing) return
           setProcessing(true)
