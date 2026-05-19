@@ -78,8 +78,15 @@ export default function SchedulePage() {
   function openPopup(workerId: string, day: number) {
     if (!isAdmin) return
     const existing = shifts[workerId]?.[day]
-    setPopupFrom(existing?.start_time?.slice(0,5) || (isWeekend(monthIdx, day) ? '08:00' : '10:00'))
-    setPopupTo(existing?.end_time?.slice(0,5) || '18:00')
+    const avail = availability[workerId]?.[day]
+    const defaultFrom = avail?.all_day === false && avail?.from_time
+      ? avail.from_time.slice(0,5)
+      : (isWeekend(monthIdx, day) ? '08:00' : '10:00')
+    const defaultTo = avail?.all_day === false && avail?.to_time
+      ? avail.to_time.slice(0,5)
+      : '18:00'
+    setPopupFrom(existing?.start_time?.slice(0,5) || defaultFrom)
+    setPopupTo(existing?.end_time?.slice(0,5) || defaultTo)
     const w = workers.find(w => w.id === workerId)
     setPopupStan(existing?.stanowisko || w?.stanowisko || '')
     setPopup({ workerId, day })
@@ -294,7 +301,18 @@ export default function SchedulePage() {
                         let color = we ? '#c8a400' : '#ccc'
                         let content = ''
                         let fontSize = '9px'
-                        if (hasAvail && !hasShift) { bg = we?'#fdd68a':'#eef4fb'; color = we?'#7a5c00':'#0a6e8a'; content = '✓'; fontSize = '12px' }
+                        if (hasAvail && !hasShift) {
+  const av = availability[w.id]?.[day]
+  bg = we?'#fdd68a':'#eef4fb'
+  color = we?'#7a5c00':'#0a6e8a'
+  if (av?.all_day === false && av?.from_time) {
+    content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
+    fontSize = '8px'
+  } else {
+    content = '✓'
+    fontSize = '12px'
+  }
+}
                         if (hasShift) { bg = '#0a6e8a'; color = 'white'; content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`; fontSize = '8px' }
                         if (isSel) { bg = hasShift ? '#064d61' : (hasAvail ? (we?'#f5a623':'#1a9bb8') : (we?'#fdd68a':'#e8f0f8')) }
                         return (
@@ -330,14 +348,21 @@ export default function SchedulePage() {
               </div>
               <div>
                 <p style={{ margin:'0 0 8px', fontSize:'13px', fontWeight:700, color:'#0a6e8a' }}>📅 Dostępni bez zmiany ({workers.filter(w => availability[w.id]?.[selectedDay] && !shifts[w.id]?.[selectedDay]).length})</p>
-                {workers.filter(w => availability[w.id]?.[selectedDay] && !shifts[w.id]?.[selectedDay]).map(w => (
-                  <div key={w.id} style={{ fontSize:'13px', color:'#6b8a95', marginBottom:'4px' }}>
-                    {w.first_name} {w.last_name} · {w.stanowisko || '—'}
-                  </div>
-                ))}
+                {workers.filter(w => availability[w.id]?.[selectedDay] && !shifts[w.id]?.[selectedDay]).map(w => {
+                  const avail = availability[w.id]?.[selectedDay]
+                  const hours = avail?.all_day === false && avail?.from_time
+                    ? `${avail.from_time.slice(0,5)}–${avail.to_time?.slice(0,5)}`
+                    : 'cały dzień'
+                  return (
+                    <div key={w.id} style={{ fontSize:'13px', color:'#6b8a95', marginBottom:'4px', display:'flex', justifyContent:'space-between' }}>
+                      <span>{w.first_name} {w.last_name} · {w.stanowisko || '—'}</span>
+                      <span style={{ color:'#0a6e8a', fontWeight:600 }}>{hours}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          </div>
+          </div> 
         )}
       </div>
     </div>
