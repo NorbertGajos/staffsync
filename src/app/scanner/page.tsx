@@ -32,7 +32,7 @@ export default function ScannerPage() {
     setError('')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        video: { facingMode: { ideal: 'environment' } }
       })
       streamRef.current = stream
       if (videoRef.current) {
