@@ -8,7 +8,7 @@ import { Profile } from '@/lib/types'
 export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const [notifStatus, setNotifStatus] = useState<'unknown' | 'granted' | 'denied' | 'loading'>('unknown')
+  const [notifStatus, setNotifStatus] = useState<'unknown' | 'default' | 'granted' | 'denied' | 'loading' | 'unsupported'>('unknown')
   const router = useRouter()
   const supabase = createClient()
 
@@ -22,8 +22,12 @@ export default function DashboardPage() {
     }
     loadProfile()
 
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setNotifStatus(Notification.permission as any)
+    if (typeof window !== 'undefined') {
+      if (!('Notification' in window)) {
+        setNotifStatus('unsupported')
+      } else {
+        setNotifStatus(Notification.permission as any)
+      }
     }
   }, [])
 
@@ -82,7 +86,10 @@ export default function DashboardPage() {
             {profile?.stanowisko && <strong style={{ color:'#0a6e8a' }}>{profile.stanowisko}</strong>}
           </p>
 
-          {notifStatus === 'unknown' && (
+          {notifStatus === 'unsupported' && (
+            <div style={{ fontSize:'13px', color:'#6b8a95' }}>📵 Twoja przeglądarka nie obsługuje powiadomień</div>
+          )}
+          {(notifStatus === 'unknown' || notifStatus === 'default') && (
             <button onClick={enableNotifications} style={{ background:'#0a6e8a', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor:'pointer', fontSize:'13px', fontWeight:600 }}>
               🔔 Włącz powiadomienia
             </button>
@@ -94,7 +101,10 @@ export default function DashboardPage() {
             <div style={{ fontSize:'13px', color:'#2d9e6b', fontWeight:600 }}>✅ Powiadomienia włączone</div>
           )}
           {notifStatus === 'denied' && (
-            <div style={{ fontSize:'13px', color:'#e8604c' }}>❌ Powiadomienia zablokowane – zezwól w ustawieniach przeglądarki</div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:'8px' }}>
+              <div style={{ fontSize:'13px', color:'#e8604c' }}>❌ Powiadomienia zablokowane</div>
+              <div style={{ fontSize:'12px', color:'#6b8a95' }}>Zezwól na powiadomienia w ustawieniach przeglądarki i odśwież stronę</div>
+            </div>
           )}
         </div>
 
