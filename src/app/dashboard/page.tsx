@@ -111,7 +111,7 @@ export default function DashboardPage() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'16px' }}>
           {[
             { icon:'📅', title:'Moja dostępność', desc:'Wpisz kiedy możesz pracować', href:'/availability', roles:['pracownik','koordynator','administrator'] },
-            { icon:'🗓', title:'Grafik', desc:'Podgląd grafiku pracy', href:'/schedule', roles:['pracownik','koordynator','administrator'] },
+            { icon:'🗓', title:'Grafik', desc:'Podgląd grafiku pracy', href:'/schedule', roles:['koordynator','administrator'] },
             { icon:'✅', title:'Lista obecności', desc:'Potwierdzanie i korekty', href:'/attendance', roles:['koordynator','administrator'] },
             { icon:'👤', title:'Mój panel', desc:'Twój grafik i statystyki', href:'/panel', roles:['pracownik','koordynator','administrator'] },
             { icon:'👥', title:'Pracownicy', desc:'Zarządzanie zespołem', href:'/admin/workers', roles:['administrator'] },
