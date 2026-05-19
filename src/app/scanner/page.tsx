@@ -11,58 +11,51 @@ type ScanResult = {
 }
 
 export default function ScannerPage() {
-  const [scanning, setScanning] = useState(false)
   const [lastScan, setLastScan] = useState<ScanResult | null>(null)
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const scannerRef = useRef<any>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     setMounted(true)
     return () => {
-      stopScanner()
+      try { if (scannerRef.current) scannerRef.current.clear() } catch {}
     }
   }, [])
 
   async function startScanner() {
     setError('')
-
-    // Najpierw poproś o uprawnienia do kamery
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      })
-      stream.getTracks().forEach(t => t.stop())
-    } catch (e) {
-      setError('Brak dostępu do kamery. Zezwól na użycie kamery w ustawieniach.')
-      return
-    }
-
     setScanning(true)
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await new Promise(r => setTimeout(r, 300))
 
     try {
-      const { Html5QrcodeScanner } = await import('html5-qrcode')
-      scannerRef.current = new Html5QrcodeScanner(
-        'qr-reader',
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-          showTorchButtonIfSupported: true,
-          useBarCodeDetectorIfSupported: true,
-          rememberLastUsedCamera: true,
-          videoConstraints: {
-            facingMode: { ideal: 'environment' }
-          }
-        },
-        false
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const html5QrCode = new Html5Qrcode('qr-reader')
+      scannerRef.current = html5QrCode
+
+      const cameras = await Html5Qrcode.getCameras()
+      if (!cameras || cameras.length === 0) {
+        setError('Nie znaleziono kamery')
+        setScanning(false)
+        return
+      }
+
+      // Użyj tylnej kamery jeśli dostępna
+      const backCamera = cameras.find(c =>
+        c.label.toLowerCase().includes('back') ||
+        c.label.toLowerCase().includes('rear') ||
+        c.label.toLowerCase().includes('environment') ||
+        c.label.toLowerCase().includes('tylna')
       )
-      scannerRef.current.render(
-        async (decodedText: string) => {
+      const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id
+
+      await html5QrCode.start(
+        cameraId,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
           if (processing) return
           setProcessing(true)
           try {
@@ -78,10 +71,10 @@ export default function ScannerPage() {
           }
           setProcessing(false)
         },
-        (_err: any) => {}
+        undefined
       )
-    } catch (e) {
-      setError('Błąd uruchamiania skanera. Spróbuj odświeżyć stronę.')
+    } catch (e: any) {
+      setError('Błąd kamery: ' + (e?.message || 'Sprawdź uprawnienia'))
       setScanning(false)
     }
   }
@@ -89,12 +82,11 @@ export default function ScannerPage() {
   async function stopScanner() {
     try {
       if (scannerRef.current) {
+        await scannerRef.current.stop()
         await scannerRef.current.clear()
         scannerRef.current = null
       }
-    } catch (e) {
-      scannerRef.current = null
-    }
+    } catch {}
     setScanning(false)
   }
 
@@ -172,11 +164,8 @@ export default function ScannerPage() {
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:'64px', marginBottom:'16px' }}>📷</div>
             <h3 style={{ margin:'0 0 8px', color:'#064d61', fontSize:'18px' }}>Gotowy do skanowania</h3>
-            <p style={{ margin:'0 0 8px', color:'#6b8a95', fontSize:'13px' }}>
-              Kliknij aby uruchomić kamerę tylną i skanować QR kody
-            </p>
-            <p style={{ margin:'0 0 20px', color:'#f5a623', fontSize:'12px', fontWeight:600 }}>
-              ⚠️ Na iPhone: użyj Safari i zezwól na dostęp do kamery
+            <p style={{ margin:'0 0 20px', color:'#6b8a95', fontSize:'13px' }}>
+              Kliknij aby uruchomić kamerę i skanować QR kody pracowników
             </p>
             <button
               onClick={startScanner}
@@ -187,7 +176,7 @@ export default function ScannerPage() {
           </div>
         ) : (
           <div>
-            <div id="qr-reader" style={{ width:'100%' }} />
+            <div id="qr-reader" style={{ width:'100%', borderRadius:'12px', overflow:'hidden' }} />
             <button
               onClick={stopScanner}
               style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 24px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600, width:'100%', marginTop:'12px' }}
