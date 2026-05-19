@@ -35,42 +35,45 @@ export default function ScannerPage() {
         video: { facingMode: { ideal: 'environment' } }
       })
       streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play()
+      const video = videoRef.current
+      if (video) {
+        video.srcObject = stream
+        await video.play()
       }
       setScanning(true)
-      scanLoop()
+      startLoop()
     } catch (e: any) {
       setError('Błąd kamery: ' + (e?.message || 'Sprawdź uprawnienia'))
     }
   }
 
-  async function scanLoop() {
+  async function startLoop() {
     const jsQR = (await import('jsqr')).default
-    function tick() {
+    function loop() {
       const video = videoRef.current
       const canvas = canvasRef.current
-      if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        animRef.current = requestAnimationFrame(tick)
+      if (!video || !canvas || video.readyState < 2 || video.videoWidth === 0) {
+        animRef.current = requestAnimationFrame(loop)
         return
       }
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
       const ctx = canvas.getContext('2d')
-      if (!ctx) { animRef.current = requestAnimationFrame(tick); return }
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height)
+      if (!ctx) { animRef.current = requestAnimationFrame(loop); return }
+      ctx.drawImage(video, 0, 0)
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(img.data, img.width, img.height)
       if (code && !processingRef.current && code.data !== lastScannedRef.current) {
         lastScannedRef.current = code.data
-        handleQR(code.data)
-        // Zresetuj po 3 sekundach żeby można skanować ponownie
-        setTimeout(() => { lastScannedRef.current = '' }, 6000)
+        processingRef.current = true
+        handleQR(code.data).finally(() => {
+          processingRef.current = false
+          setTimeout(() => { lastScannedRef.current = '' }, 6000)
+        })
       }
-      animRef.current = requestAnimationFrame(tick)
+      animRef.current = requestAnimationFrame(loop)
     }
-    animRef.current = requestAnimationFrame(tick)
+    loop()
   }
 
   async function stopScanner() {
@@ -79,30 +82,25 @@ export default function ScannerPage() {
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
+    if (videoRef.current) videoRef.current.srcObject = null
     setScanning(false)
   }
 
   async function handleQR(text: string) {
-    processingRef.current = true
     try {
       const data = JSON.parse(text)
-      if (!data.userId) { setError('Nieprawidłowy QR kod'); processingRef.current = false; return }
+      if (!data.userId) { setError('Nieprawidłowy QR kod'); return }
       await handleScan(data)
     } catch {
       setError('Nieprawidłowy QR kod')
     }
-    processingRef.current = false
   }
 
   async function handleScan(data: { userId: string, name: string, stanowisko: string }) {
     const today = new Date()
     const date = today.toISOString().split('T')[0]
     const time = today.toTimeString().slice(0, 5)
-
-    const { data: existing } = await supabase
-      .from('attendance').select('*')
-      .eq('user_id', data.userId).eq('date', date).single()
-
+    const { data: existing } = await supabase.from('attendance').select('*').eq('user_id', data.userId).eq('date', date).single()
     if (!existing) {
       await supabase.from('attendance').insert({ user_id: data.userId, date, actual_start: time, status: 'obecny' })
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkin', time })
@@ -113,7 +111,6 @@ export default function ScannerPage() {
       await supabase.from('attendance').update({ actual_start: time, actual_end: null, status: 'obecny' }).eq('id', existing.id)
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkin', time })
     }
-
     setTimeout(() => setLastScan(null), 5000)
   }
 
@@ -143,22 +140,29 @@ export default function ScannerPage() {
       )}
 
       <div style={{ background:'white', borderRadius:'24px', padding:'24px', maxWidth:'400px', width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
-        {!scanning ? (
+
+        {/* Video zawsze w DOM - wymagane przez Safari */}
+        <div style={{ display: scanning ? 'block' : 'none', position:'relative' }}>
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            style={{ width:'100%', borderRadius:'12px', display:'block', background:'#000' }}
+          />
+          <canvas ref={canvasRef} style={{ display:'none' }} />
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:'65%', paddingBottom:'65%', border:'3px solid #0a6e8a', borderRadius:'12px', pointerEvents:'none' }} />
+          <button onClick={stopScanner} style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 24px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600, width:'100%', marginTop:'12px' }}>
+            ✕ Zatrzymaj skaner
+          </button>
+        </div>
+
+        {!scanning && (
           <div style={{ textAlign:'center' }}>
             <div style={{ fontSize:'64px', marginBottom:'16px' }}>📷</div>
             <h3 style={{ margin:'0 0 8px', color:'#064d61', fontSize:'18px' }}>Gotowy do skanowania</h3>
             <p style={{ margin:'0 0 20px', color:'#6b8a95', fontSize:'13px' }}>Kliknij aby uruchomić kamerę i skanować QR kody pracowników</p>
             <button onClick={startScanner} style={{ background:'#0a6e8a', color:'white', border:'none', padding:'14px 32px', borderRadius:'100px', cursor:'pointer', fontSize:'15px', fontWeight:600, width:'100%' }}>
               📷 Uruchom skaner
-            </button>
-          </div>
-        ) : (
-          <div style={{ position:'relative' }}>
-            <video ref={videoRef} style={{ width:'100%', borderRadius:'12px', display:'block' }} playsInline muted />
-            <canvas ref={canvasRef} style={{ display:'none' }} />
-            <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:'200px', height:'200px', border:'3px solid #0a6e8a', borderRadius:'12px', pointerEvents:'none' }} />
-            <button onClick={stopScanner} style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 24px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600, width:'100%', marginTop:'12px' }}>
-              ✕ Zatrzymaj skaner
             </button>
           </div>
         )}
