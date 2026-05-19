@@ -36,7 +36,6 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial, sans-serif' }}>
 
-      {/* HEADER */}
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', boxShadow:'0 2px 10px rgba(0,0,0,0.2)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
           <span style={{ fontSize:'28px' }}>🏖</span>
@@ -56,10 +55,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* CONTENT */}
       <div style={{ padding:'32px 24px', maxWidth:'900px', margin:'0 auto' }}>
 
-        {/* WELCOME */}
         <div style={{ background:'white', borderRadius:'22px', padding:'28px', marginBottom:'20px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <h2 style={{ color:'#064d61', margin:'0 0 8px', fontSize:'22px' }}>Witaj, {profile?.first_name}! 👋</h2>
           <p style={{ color:'#6b8a95', margin:0, fontSize:'14px' }}>
@@ -69,7 +66,6 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* MENU KAFELKI */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:'16px' }}>
           {[
             { icon:'📅', title:'Moja dostępność', desc:'Wpisz kiedy możesz pracować', href:'/availability', roles:['pracownik','koordynator','administrator'] },
@@ -79,6 +75,7 @@ export default function DashboardPage() {
             { icon:'👥', title:'Pracownicy', desc:'Zarządzanie zespołem', href:'/admin/workers', roles:['administrator'] },
             { icon:'🏷', title:'Stanowiska', desc:'Zarządzaj stanowiskami', href:'/admin/stanowiska', roles:['administrator'] },
             { icon:'⚙️', title:'Ustawienia grafiku', desc:'Limity i konfiguracja', href:'/admin/settings', roles:['administrator','koordynator'] },
+            { icon:'📊', title:'Raporty', desc:'Podsumowania miesięczne', href:'/reports', roles:['administrator','koordynator'] },
             { icon:'💬', title:'Uwagi i żale', desc:'Skrzynka sugestii', href:'/feedback', roles:['pracownik','koordynator','administrator'] },
             { icon:'📱', title:'Mój QR kod', desc:'Pokaż przy wejściu do pracy', href:'/qr', roles:['pracownik','koordynator','administrator'] },
             { icon:'📷', title:'Skaner QR', desc:'Skanuj obecność pracowników', href:'/scanner', roles:['administrator','koordynator'] },
