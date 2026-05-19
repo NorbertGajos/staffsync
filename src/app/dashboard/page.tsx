@@ -22,7 +22,6 @@ export default function DashboardPage() {
     }
     loadProfile()
 
-    // Sprawdź status powiadomień
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotifStatus(Notification.permission as any)
     }
@@ -39,11 +38,7 @@ export default function DashboardPage() {
     try {
       const { requestNotificationPermission } = await import('@/lib/firebase')
       const token = await requestNotificationPermission(profile.id)
-      if (token) {
-        setNotifStatus('granted')
-      } else {
-        setNotifStatus('denied')
-      }
+      if (token) { setNotifStatus('granted') } else { setNotifStatus('denied') }
     } catch (e) {
       setNotifStatus('denied')
     }
@@ -87,7 +82,6 @@ export default function DashboardPage() {
             {profile?.stanowisko && <strong style={{ color:'#0a6e8a' }}>{profile.stanowisko}</strong>}
           </p>
 
-          {/* POWIADOMIENIA */}
           {notifStatus === 'unknown' && (
             <button onClick={enableNotifications} style={{ background:'#0a6e8a', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor:'pointer', fontSize:'13px', fontWeight:600 }}>
               🔔 Włącz powiadomienia
@@ -114,6 +108,7 @@ export default function DashboardPage() {
             { icon:'🏷', title:'Stanowiska', desc:'Zarządzaj stanowiskami', href:'/admin/stanowiska', roles:['administrator'] },
             { icon:'⚙️', title:'Ustawienia grafiku', desc:'Limity i konfiguracja', href:'/admin/settings', roles:['administrator','koordynator'] },
             { icon:'📊', title:'Raporty', desc:'Podsumowania miesięczne', href:'/reports', roles:['administrator','koordynator'] },
+            { icon:'🔔', title:'Powiadomienia', desc:'Wyślij wiadomość do pracowników', href:'/admin/notifications', roles:['administrator'] },
             { icon:'💬', title:'Uwagi i żale', desc:'Skrzynka sugestii', href:'/feedback', roles:['pracownik','koordynator','administrator'] },
             { icon:'📱', title:'Mój QR kod', desc:'Pokaż przy wejściu do pracy', href:'/qr', roles:['pracownik','koordynator','administrator'] },
             { icon:'📷', title:'Skaner QR', desc:'Skanuj obecność pracowników', href:'/scanner', roles:['administrator','koordynator'] },
