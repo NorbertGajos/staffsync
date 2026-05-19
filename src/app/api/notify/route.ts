@@ -15,7 +15,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Brak tytułu lub treści' }, { status: 400 })
     }
 
-    // Pobierz tokeny – wszystkich lub wybranych użytkowników
     let query = supabaseAdmin.from('push_tokens').select('token, user_id')
     if (user_ids && user_ids.length > 0) {
       query = query.in('user_id', user_ids)
@@ -26,10 +25,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Brak tokenów – nikt nie włączył powiadomień' }, { status: 400 })
     }
 
-    // Wyślij przez Firebase Cloud Messaging
-    const fcmUrl = 'https://fcm.googleapis.com/v1/projects/staffsync-c7ea1/messages:send'
-
     const accessToken = await getFirebaseAccessToken()
+
+    const fcmUrl = `https://fcm.googleapis.com/v1/projects/staffsync-c7ea1/messages:send`
 
     const results = await Promise.allSettled(
       tokens.map(async ({ token }) => {
@@ -49,13 +47,14 @@ export async function POST(request: Request) {
                   body,
                   icon: '/icon-192.png',
                   badge: '/icon-192.png',
-                  vibrate: [200, 100, 200],
                 }
               }
             }
           })
         })
-        return res.json()
+        const json = await res.json()
+        if (!res.ok) console.error('FCM error:', JSON.stringify(json))
+        return json
       })
     )
 
@@ -81,35 +80,36 @@ async function getFirebaseAccessToken(): Promise<string> {
     scope: 'https://www.googleapis.com/auth/firebase.messaging',
   }
 
-  // Zakoduj JWT
-  const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
-  const body = btoa(JSON.stringify(payload))
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const signingInput = `${header}.${body}`
 
-  // Podpisz używając klucza prywatnego
   const privateKey = serviceAccount.private_key
-  const encoder = new TextEncoder()
   const keyData = privateKey
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
     .replace(/\n/g, '')
 
-  const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0))
+  const binaryKey = Buffer.from(keyData, 'base64')
+
   const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8', binaryKey.buffer,
+    'pkcs8',
+    binaryKey,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, ['sign']
+    false,
+    ['sign']
   )
 
+  const encoder = new TextEncoder()
   const signature = await crypto.subtle.sign(
     'RSASSA-PKCS1-v1_5',
     cryptoKey,
     encoder.encode(signingInput)
   )
 
-  const jwt = `${signingInput}.${btoa(String.fromCharCode(...new Uint8Array(signature)))}`
+  const sig = Buffer.from(signature).toString('base64url')
+  const jwt = `${signingInput}.${sig}`
 
-  // Wymień JWT na access token
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -117,5 +117,9 @@ async function getFirebaseAccessToken(): Promise<string> {
   })
 
   const tokenData = await tokenRes.json()
+  if (!tokenData.access_token) {
+    console.error('Token error:', JSON.stringify(tokenData))
+    throw new Error('Nie można uzyskać access token: ' + JSON.stringify(tokenData))
+  }
   return tokenData.access_token
 }
