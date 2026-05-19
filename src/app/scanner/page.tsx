@@ -17,6 +17,7 @@ export default function ScannerPage() {
   const [mounted, setMounted] = useState(false)
   const [scanning, setScanning] = useState(false)
   const scannerRef = useRef<any>(null)
+  const processingRef = useRef(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -40,12 +41,14 @@ export default function ScannerPage() {
         { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 300, height: 300 }, aspectRatio: 1.333 },
         async (decodedText) => {
-          if (processing) return
+          if (processingRef.current) return
+          processingRef.current = true
           setProcessing(true)
           try {
             const data = JSON.parse(decodedText)
             if (!data.userId) {
               setError('Nieprawidłowy QR kod')
+              processingRef.current = false
               setProcessing(false)
               return
             }
@@ -53,7 +56,10 @@ export default function ScannerPage() {
           } catch {
             setError('Nieprawidłowy QR kod')
           }
-          setProcessing(false)
+          setTimeout(() => {
+            processingRef.current = false
+            setProcessing(false)
+          }, 10000)
         },
         undefined
       )
@@ -96,7 +102,7 @@ export default function ScannerPage() {
       setLastScan({ name: data.name, stanowisko: data.stanowisko, action: 'checkin', time })
     }
 
-    setTimeout(() => setLastScan(null), 5000)
+    setTimeout(() => setLastScan(null), 10000)
   }
 
   if (!mounted) return null
