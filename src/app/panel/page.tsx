@@ -251,6 +251,11 @@ export default function PanelPage() {
             <div style={{ fontWeight:700, fontSize:'14px', color:'#064d61' }}>Uwagi i żale</div>
             <div style={{ fontSize:'12px', color:'#6b8a95', marginTop:'4px' }}>Napisz do managera</div>
           </button>
+          <button onClick={()=>router.push('/change-password')} style={{ background:'white', border:'2px solid #ddeaf0', borderRadius:'16px', padding:'20px', cursor:'pointer', textAlign:'left' as const, gridColumn:'1 / -1' }}>
+            <div style={{ fontSize:'24px', marginBottom:'8px' }}>🔑</div>
+            <div style={{ fontWeight:700, fontSize:'14px', color:'#064d61' }}>Zmień hasło</div>
+            <div style={{ fontSize:'12px', color:'#6b8a95', marginTop:'4px' }}>Zaktualizuj swoje hasło dostępu</div>
+          </button>
         </div>
       </div>
     </div>
