@@ -21,10 +21,10 @@ export default function AdminDocumentsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      if (!['administrator', 'koordynator'].includes(prof?.role)) { router.push('/dashboard'); return }
+      if (!['administrator', 'koordynator'].includes((prof as any)?.role)) { router.push('/dashboard'); return }
       await loadDocs()
       const { data: stan } = await supabase.from('stanowiska').select('nazwa').eq('aktywne', true).order('kolejnosc')
-      setStanowiska(stan?.map(s => s.nazwa) || [])
+      setStanowiska((stan as any[])?.map((s: any) => s.nazwa) || [])
       setLoading(false)
     }
     load()
@@ -32,7 +32,7 @@ export default function AdminDocumentsPage() {
 
   async function loadDocs() {
     const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false })
-    setDocs(data || [])
+    setDocs((data as any[]) || [])
   }
 
   async function handleUpload(e: React.FormEvent) {
@@ -47,17 +47,17 @@ export default function AdminDocumentsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`
       const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file)
-      if (uploadError) { setError('Błąd uploadu: ' + uploadError.message); setUploading(false); return }
+      if (uploadError) { setError('Błąd uploadu: ' + (uploadError as any).message); setUploading(false); return }
 
-      const { error: dbError } = await supabase.from('documents').insert({
+      const { error: dbError } = await supabase.from('documents').insert([{
         title: form.title,
         description: form.description,
         file_path: fileName,
         stanowisko: form.stanowisko || null,
         created_by: user?.id
-      })
+      }] as any)
 
-      if (dbError) { setError('Błąd zapisu: ' + dbError.message); setUploading(false); return }
+      if (dbError) { setError('Błąd zapisu: ' + (dbError as any).message); setUploading(false); return }
 
       setMsg('✅ Dokument dodany!')
       setForm({ title: '', description: '', stanowisko: '' })
@@ -98,7 +98,6 @@ export default function AdminDocumentsPage() {
         {msg && <div style={{ background:'#d5f5e3', border:'1px solid #2d9e6b', borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', color:'#1a5e3a', fontSize:'14px', fontWeight:600 }}>{msg}</div>}
         {error && <div style={{ background:'#fff0ee', border:'1px solid #e8604c', borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', color:'#e8604c', fontSize:'14px', fontWeight:600 }}>❌ {error}</div>}
 
-        {/* FORMULARZ */}
         <div style={{ background:'white', borderRadius:'22px', padding:'28px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)', marginBottom:'20px' }}>
           <h2 style={{ margin:'0 0 20px', color:'#064d61', fontSize:'18px' }}>➕ Dodaj dokument</h2>
           <form onSubmit={handleUpload}>
@@ -131,12 +130,11 @@ export default function AdminDocumentsPage() {
           </form>
         </div>
 
-        {/* LISTA */}
         {docs.length > 0 && (
           <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
             <h3 style={{ margin:'0 0 16px', color:'#064d61', fontSize:'16px' }}>📚 Dodane dokumenty ({docs.length})</h3>
             <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
-              {docs.map(doc => (
+              {docs.map((doc: any) => (
                 <div key={doc.id} style={{ background:'#fafcfd', borderRadius:'12px', padding:'14px 16px', border:'2px solid #ddeaf0', display:'flex', alignItems:'center', gap:'12px' }}>
                   <div style={{ fontSize:'28px' }}>📄</div>
                   <div style={{ flex:1 }}>
