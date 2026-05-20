@@ -45,7 +45,7 @@ export default function AdminDocumentsPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`
+      const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_').replace(/[^a-zA-Z0-9._-]/g, '')}`
       const { error: uploadError } = await supabase.storage.from('documents').upload(fileName, file)
       if (uploadError) { setError('Błąd uploadu: ' + (uploadError as any).message); setUploading(false); return }
 
