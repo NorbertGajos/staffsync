@@ -32,7 +32,7 @@ export default function SettingsPage() {
 
   async function loadAll() {
     const { data: s } = await supabase.from('stanowiska').select('nazwa').eq('aktywne', true).order('kolejnosc')
-    const names = s?.map(x => x.nazwa) || []
+    const names = (s as any[])?.map((x: any) => x.nazwa) || []
     setStanowiska(names)
     if (names.length > 0) setSelectedStan(names[0])
 
