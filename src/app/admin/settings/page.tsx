@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { MONTHS, STANOWISKA } from '@/lib/types'
+import { MONTHS } from '@/lib/types'
 
 const MONTH_START_DAYS = [0, 2, 5]
 const PL_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
@@ -20,44 +20,34 @@ type Limits = Record<number, Record<string, { min: number, max: number }>>
 export default function SettingsPage() {
   const [monthIdx, setMonthIdx] = useState(0)
   const [limits, setLimits] = useState<Limits>({})
+  const [stanowiska, setStanowiska] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [selectedStan, setSelectedStan] = useState<string>(STANOWISKA[0])
+  const [selectedStan, setSelectedStan] = useState<string>('')
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => { loadLimits() }, [])
+  useEffect(() => { loadAll() }, [])
 
-  async function loadLimits() {
-    // Pobierz lub stwórz grafiki dla wszystkich miesięcy
+  async function loadAll() {
+    const { data: s } = await supabase.from('stanowiska').select('nazwa').eq('aktywne', true).order('kolejnosc')
+    const names = s?.map(x => x.nazwa) || []
+    setStanowiska(names)
+    if (names.length > 0) setSelectedStan(names[0])
+
     for (const m of MONTHS) {
-      const { data: existing } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('month', m.month)
-        .eq('year', m.year)
-        .single()
-
-      if (!existing) {
-        await supabase.from('schedules').insert({
-          month: m.month, year: m.year, status: 'draft'
-        })
-      }
+      const { data: existing } = await supabase.from('schedules').select('*').eq('month', m.month).eq('year', m.year).single()
+      if (!existing) await supabase.from('schedules').insert({ month: m.month, year: m.year, status: 'draft' })
     }
 
-    // Pobierz limity
-    const { data } = await supabase
-      .from('schedule_limits')
-      .select('*, schedules(month, year)')
-
+    const { data } = await supabase.from('schedule_limits').select('*, schedules(month, year)')
     const map: Limits = {}
     data?.forEach(l => {
       const mi = MONTHS.findIndex(m => m.month === l.schedules?.month && m.year === l.schedules?.year)
       if (mi === -1) return
       if (!map[mi]) map[mi] = {}
-      const key = `${l.day_of_month}_${l.stanowisko}`
-      map[mi][key] = { min: l.min_workers, max: l.max_workers }
+      map[mi][`${l.day_of_month}_${l.stanowisko}`] = { min: l.min_workers, max: l.max_workers }
     })
     setLimits(map)
     setLoading(false)
@@ -82,65 +72,33 @@ export default function SettingsPage() {
   async function handleSave() {
     setSaving(true)
     const m = MONTHS[monthIdx]
-
-    // Pobierz schedule_id
-    const { data: schedule } = await supabase
-      .from('schedules')
-      .select('id')
-      .eq('month', m.month)
-      .eq('year', m.year)
-      .single()
-
+    const { data: schedule } = await supabase.from('schedules').select('id').eq('month', m.month).eq('year', m.year).single()
     if (!schedule) { setSaving(false); return }
-
-    // Usuń stare limity dla tego miesiąca i stanowiska
-    await supabase
-      .from('schedule_limits')
-      .delete()
-      .eq('schedule_id', schedule.id)
-      .eq('stanowisko', selectedStan)
-
-    // Wstaw nowe
+    await supabase.from('schedule_limits').delete().eq('schedule_id', schedule.id).eq('stanowisko', selectedStan)
     const toInsert = []
     for (let day = 1; day <= m.days; day++) {
       const lim = getLimit(monthIdx, day, selectedStan)
       if (lim.min > 0 || lim.max > 0) {
-        toInsert.push({
-          schedule_id: schedule.id,
-          stanowisko: selectedStan,
-          day_of_month: day,
-          min_workers: lim.min,
-          max_workers: lim.max,
-        })
+        toInsert.push({ schedule_id: schedule.id, stanowisko: selectedStan, day_of_month: day, min_workers: lim.min, max_workers: lim.max })
       }
     }
-
-    if (toInsert.length > 0) {
-      await supabase.from('schedule_limits').insert(toInsert)
-    }
-
+    if (toInsert.length > 0) await supabase.from('schedule_limits').insert(toInsert)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
 
   function copyWeekdayToAll() {
-    // Kopiuje wartości z Poniedziałku do wszystkich dni roboczych
     const m = MONTHS[monthIdx]
     const mondayLim = (() => {
-      for (let d = 1; d <= m.days; d++) {
-        if (getDow(monthIdx, d) === 0) return getLimit(monthIdx, d, selectedStan)
-      }
+      for (let d = 1; d <= m.days; d++) { if (getDow(monthIdx, d) === 0) return getLimit(monthIdx, d, selectedStan) }
       return { min: 0, max: 0 }
     })()
-
     setLimits(prev => {
       const next = JSON.parse(JSON.stringify(prev))
       if (!next[monthIdx]) next[monthIdx] = {}
       for (let d = 1; d <= m.days; d++) {
-        if (!isWeekend(monthIdx, d)) {
-          next[monthIdx][`${d}_${selectedStan}`] = { ...mondayLim }
-        }
+        if (!isWeekend(monthIdx, d)) next[monthIdx][`${d}_${selectedStan}`] = { ...mondayLim }
       }
       return next
     })
@@ -149,19 +107,14 @@ export default function SettingsPage() {
   function copyWeekendToAll() {
     const m = MONTHS[monthIdx]
     const satLim = (() => {
-      for (let d = 1; d <= m.days; d++) {
-        if (getDow(monthIdx, d) === 5) return getLimit(monthIdx, d, selectedStan)
-      }
+      for (let d = 1; d <= m.days; d++) { if (getDow(monthIdx, d) === 5) return getLimit(monthIdx, d, selectedStan) }
       return { min: 0, max: 0 }
     })()
-
     setLimits(prev => {
       const next = JSON.parse(JSON.stringify(prev))
       if (!next[monthIdx]) next[monthIdx] = {}
       for (let d = 1; d <= m.days; d++) {
-        if (isWeekend(monthIdx, d)) {
-          next[monthIdx][`${d}_${selectedStan}`] = { ...satLim }
-        }
+        if (isWeekend(monthIdx, d)) next[monthIdx][`${d}_${selectedStan}`] = { ...satLim }
       }
       return next
     })
@@ -178,7 +131,6 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
 
-      {/* HEADER */}
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>
           ← Wróć
@@ -191,7 +143,6 @@ export default function SettingsPage() {
 
       <div style={{ padding:'20px', maxWidth:'900px', margin:'0 auto' }}>
 
-        {/* MONTH TABS */}
         <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
           {MONTHS.map((mo,i) => (
             <button key={i} onClick={()=>setMonthIdx(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
@@ -208,26 +159,20 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* STANOWISKO SELECT */}
           <div style={{ marginBottom:'20px' }}>
             <label style={{ display:'block', fontSize:'11px', fontWeight:600, color:'#6b8a95', textTransform:'uppercase' as const, letterSpacing:'0.5px', marginBottom:'8px' }}>
               Wybierz stanowisko
             </label>
-            <select
-              value={selectedStan}
-              onChange={e => setSelectedStan(e.target.value)}
-              style={{ width:'100%', padding:'12px', border:'2px solid #ddeaf0', borderRadius:'12px', fontSize:'14px', color:'#1a2c35', outline:'none', background:'white' }}
-            >
-              {STANOWISKA.map(s => <option key={s} value={s}>{s}</option>)}
+            <select value={selectedStan} onChange={e=>setSelectedStan(e.target.value)}
+              style={{ width:'100%', padding:'12px', border:'2px solid #ddeaf0', borderRadius:'12px', fontSize:'14px', color:'#1a2c35', outline:'none', background:'white' }}>
+              {stanowiska.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
-          {/* INFO */}
           <div style={{ background:'#fff8ec', border:'1.5px solid #fdd68a', borderRadius:'12px', padding:'12px 16px', marginBottom:'20px', fontSize:'13px', color:'#7a5c00' }}>
-            💡 <strong>Min</strong> = minimalna obsada (ostrzeżenie gdy za mało) · <strong>Max</strong> = limit (blokuje zapisy gdy pełny) · <strong>0</strong> = brak limitu
+            💡 <strong>Min</strong> = minimalna obsada · <strong>Max</strong> = limit (blokuje zapisy) · <strong>0</strong> = brak limitu
           </div>
 
-          {/* QUICK COPY */}
           <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
             <button onClick={copyWeekdayToAll} style={{ background:'#eef4fb', color:'#0a6e8a', border:'none', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'12px', fontWeight:600 }}>
               📋 Kopiuj Pn → wszystkie dni robocze
@@ -237,7 +182,6 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          {/* DAYS GRID */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
             {PL_DAYS.map((d,i) => (
               <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
@@ -251,30 +195,18 @@ export default function SettingsPage() {
               const lim = getLimit(monthIdx, day, selectedStan)
               const hasLimit = lim.min > 0 || lim.max > 0
               return (
-                <div key={day} style={{
-                  borderRadius:'12px',
-                  border: `2px solid ${we?'#fdd68a':'#ddeaf0'}`,
-                  background: we ? '#fff8ec' : (hasLimit ? '#f0faf5' : '#fafcfd'),
-                  padding:'8px 4px',
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:'4px'
-                }}>
+                <div key={day} style={{ borderRadius:'12px', border:`2px solid ${we?'#fdd68a':'#ddeaf0'}`, background: we?'#fff8ec':(hasLimit?'#f0faf5':'#fafcfd'), padding:'8px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
                   <div style={{ fontWeight:700, fontSize:'12px', color: we?'#b87a00':'#064d61', lineHeight:1 }}>{day}</div>
                   <div style={{ fontSize:'8px', color: we?'#b87a00':'#6b8a95', marginBottom:'2px' }}>{PL_DAYS[getDow(monthIdx,day)]}</div>
                   <div style={{ width:'100%' }}>
                     <div style={{ fontSize:'8px', color:'#2d9e6b', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MIN</div>
-                    <input
-                      type="number" min="0" value={lim.min}
-                      onChange={e => setLimit(monthIdx, day, selectedStan, 'min', e.target.value)}
-                      style={{ width:'100%', padding:'3px', border:'1.5px solid #a5d6a7', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }}
-                    />
+                    <input type="number" min="0" value={lim.min} onChange={e=>setLimit(monthIdx, day, selectedStan, 'min', e.target.value)}
+                      style={{ width:'100%', padding:'3px', border:'1.5px solid #a5d6a7', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
                   </div>
                   <div style={{ width:'100%' }}>
                     <div style={{ fontSize:'8px', color:'#0a6e8a', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MAX</div>
-                    <input
-                      type="number" min="0" value={lim.max}
-                      onChange={e => setLimit(monthIdx, day, selectedStan, 'max', e.target.value)}
-                      style={{ width:'100%', padding:'3px', border:'1.5px solid #ddeaf0', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }}
-                    />
+                    <input type="number" min="0" value={lim.max} onChange={e=>setLimit(monthIdx, day, selectedStan, 'max', e.target.value)}
+                      style={{ width:'100%', padding:'3px', border:'1.5px solid #ddeaf0', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
                   </div>
                 </div>
               )
