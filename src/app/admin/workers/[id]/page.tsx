@@ -15,6 +15,7 @@ export default function EditWorkerPage() {
   const [newPassword, setNewPassword] = useState('')
   const [showReset, setShowReset] = useState(false)
   const [note, setNote] = useState('')
+  const [authEmail, setAuthEmail] = useState('')
   const [msg, setMsg] = useState('')
   const [form, setForm] = useState({
     first_name: '',
@@ -46,7 +47,16 @@ export default function EditWorkerPage() {
         })
       }
       const { data: s } = await supabase.from('stanowiska').select('nazwa').eq('aktywne', true).order('kolejnosc')
-      setStanowiska(s?.map(x => x.nazwa) || [])
+      setStanowiska(s?.map((x: any) => x.nazwa) || [])
+
+      const res = await fetch('/api/admin/get-user-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: id })
+      })
+      const emailData = await res.json()
+      if (emailData.email) setAuthEmail(emailData.email)
+
       setLoading(false)
     }
     load()
@@ -184,14 +194,19 @@ export default function EditWorkerPage() {
         </div>
 
         {/* DANE LOGOWANIA */}
-        {profile?.login && (
-          <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginBottom:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin:'0 0 12px', color:'#064d61', fontSize:'16px' }}>🔑 Dane logowania</h3>
+        <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginBottom:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
+          <h3 style={{ margin:'0 0 12px', color:'#064d61', fontSize:'16px' }}>🔑 Dane logowania</h3>
+          {profile?.login && (
             <p style={{ margin:'0 0 8px', fontSize:'14px', color:'#1a2c35' }}>
               Login: <strong style={{ color:'#0a6e8a' }}>{profile.login}</strong>
             </p>
-          </div>
-        )}
+          )}
+          {authEmail && (
+            <p style={{ margin:'0', fontSize:'14px', color:'#1a2c35' }}>
+              Email: <strong style={{ color:'#0a6e8a' }}>{authEmail}</strong>
+            </p>
+          )}
+        </div>
 
         {/* RESET HASŁA */}
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginBottom:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
