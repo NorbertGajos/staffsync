@@ -62,6 +62,17 @@ export default function EditWorkerPage() {
     load()
   }, [params.id])
 
+  async function handleDelete() {
+    if (!confirm(`Usunąć pracownika ${profile?.first_name} ${profile?.last_name}? Tej operacji nie można cofnąć!`)) return
+    const id = Array.isArray(params.id) ? params.id[0] : params.id
+    await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: id })
+    })
+    router.push('/admin/workers')
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -182,12 +193,15 @@ export default function EditWorkerPage() {
                 </select>
               </div>
             </div>
-            <div style={{ display:'flex', gap:'12px', marginTop:'8px' }}>
+            <div style={{ display:'flex', gap:'12px', marginTop:'8px', flexWrap:'wrap' }}>
               <button type="submit" disabled={saving} style={{ background: saving?'#6b8a95':'#0a6e8a', color:'white', border:'none', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
                 {saving ? 'Zapisywanie...' : '💾 Zapisz zmiany'}
               </button>
               <button type="button" onClick={()=>router.push('/admin/workers')} style={{ background:'transparent', color:'#0a6e8a', border:'2px solid #1a9bb8', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
                 Anuluj
+              </button>
+              <button type="button" onClick={handleDelete} style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
+                🗑 Usuń pracownika
               </button>
             </div>
           </form>
