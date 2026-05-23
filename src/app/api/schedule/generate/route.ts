@@ -173,7 +173,7 @@ export async function POST(request: Request) {
         scheduleId: (schedule as any).id,
         availMapKeys: Object.keys(availMap).length,
         day1limits: limitsMap[1] || {},
-        day1available: Array.from(availMap).slice(0, 3).map(([k, v]) => ({ user: k, days: Array.from(v).slice(0, 5) })),
+        day1available: Object.entries(availMap).slice(0, 3).map(([k, v]) => ({ user: k, days: Array.from(v).slice(0, 5) })),
       }
     })
 
