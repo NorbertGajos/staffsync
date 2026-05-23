@@ -165,7 +165,16 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       shiftsCreated: shiftsToInsert.length,
-      hoursPerWorker: summary
+      hoursPerWorker: summary,
+      debug: {
+        workersCount: (workers as any[]).length,
+        availabilityCount: availability?.length || 0,
+        limitsCount: (limits as any[])?.length || 0,
+        scheduleId: (schedule as any).id,
+        availMapKeys: Object.keys(availMap).length,
+        day1limits: limitsMap[1] || {},
+        day1available: Array.from(availMap).slice(0, 3).map(([k, v]) => ({ user: k, days: Array.from(v).slice(0, 5) })),
+      }
     })
 
   } catch (error: any) {
