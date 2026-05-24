@@ -1,12 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
-
 const WEEKDAY_START = '10:00'
 const WEEKDAY_END = '18:00'
 const WEEKEND_START = '08:00'
@@ -21,6 +15,12 @@ function isWeekend(year: number, month: number, day: number): boolean {
 }
 
 export async function POST(request: Request) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   try {
     const { month, year, overwrite = false } = await request.json()
 
@@ -49,8 +49,11 @@ export async function POST(request: Request) {
 
     const from = `${year}-${String(month).padStart(2,'0')}-01`
     const to = `${year}-${String(month).padStart(2,'0')}-31`
-    const { data: availability } = await supabaseAdmin
+    const { data: availability, error: availError } = await supabaseAdmin
       .from('availability').select('*').gte('date', from).lte('date', to)
+
+    console.log('AVAIL ERROR:', JSON.stringify(availError))
+    console.log('AVAIL COUNT:', availability?.length)
 
     const availMap: Record<string, Set<number>> = {}
     availability?.forEach((a: any) => {
