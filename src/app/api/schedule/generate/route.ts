@@ -24,6 +24,10 @@ export async function POST(request: Request) {
   try {
     const { month, year, overwrite = false } = await request.json()
 
+    const daysInMonth = new Date(year, month, 0).getDate()
+    const from = `${year}-${String(month).padStart(2,'0')}-01`
+    const to = `${year}-${String(month).padStart(2,'0')}-${String(daysInMonth).padStart(2,'0')}`
+
     let { data: schedule } = await supabaseAdmin
       .from('schedules').select('id').eq('month', month).eq('year', year).single()
 
@@ -38,8 +42,8 @@ export async function POST(request: Request) {
     if (overwrite) {
       await supabaseAdmin.from('shifts')
         .delete()
-        .gte('date', `${year}-${String(month).padStart(2,'0')}-01`)
-        .lte('date', `${year}-${String(month).padStart(2,'0')}-31`)
+        .gte('date', from)
+        .lte('date', to)
     }
 
     const { data: workers } = await supabaseAdmin
@@ -47,13 +51,8 @@ export async function POST(request: Request) {
 
     if (!workers?.length) return NextResponse.json({ error: 'Brak pracowników' }, { status: 400 })
 
-    const from = `${year}-${String(month).padStart(2,'0')}-01`
-    const to = `${year}-${String(month).padStart(2,'0')}-31`
-    const { data: availability, error: availError } = await supabaseAdmin
+    const { data: availability } = await supabaseAdmin
       .from('availability').select('*').gte('date', from).lte('date', to)
-
-    console.log('AVAIL ERROR:', JSON.stringify(availError))
-    console.log('AVAIL COUNT:', availability?.length)
 
     const availMap: Record<string, Set<number>> = {}
     availability?.forEach((a: any) => {
@@ -80,7 +79,6 @@ export async function POST(request: Request) {
     const weekendCount: Record<string, number> = {}
     ;(workers as any[]).forEach((w: any) => { hoursCount[w.id] = 0; weekendCount[w.id] = 0 })
 
-    const daysInMonth = new Date(year, month, 0).getDate()
     const shiftsToInsert: any[] = []
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -90,7 +88,7 @@ export async function POST(request: Request) {
       const endTime = we ? WEEKEND_END : WEEKDAY_END
       const hours = we ? WEEKEND_HOURS : WEEKDAY_HOURS
 
-      let availableWorkers = (workers as any[]).filter((w: any) =>
+      const availableWorkers = (workers as any[]).filter((w: any) =>
         availMap[w.id]?.has(day) && !existingSet.has(`${w.id}_${date}`)
       )
 
@@ -121,9 +119,7 @@ export async function POST(request: Request) {
           existingSet.add(`${w.id}_${date}`)
         }
       } else {
-        const stanowiskaToFill = Object.keys(dayLimits)
-
-        for (const stan of stanowiskaToFill) {
+        for (const stan of Object.keys(dayLimits)) {
           const limit = dayLimits[stan]
           if (!limit || limit.max === 0) continue
 
@@ -169,15 +165,6 @@ export async function POST(request: Request) {
       success: true,
       shiftsCreated: shiftsToInsert.length,
       hoursPerWorker: summary,
-      debug: {
-        workersCount: (workers as any[]).length,
-        availabilityCount: availability?.length || 0,
-        limitsCount: (limits as any[])?.length || 0,
-        scheduleId: (schedule as any).id,
-        availMapKeys: Object.keys(availMap).length,
-        day1limits: limitsMap[1] || {},
-        day1available: Object.entries(availMap).slice(0, 3).map(([k, v]) => ({ user: k, days: Array.from(v).slice(0, 5) })),
-      }
     })
 
   } catch (error: any) {
