@@ -23,9 +23,11 @@ const printStyles = `
     @page { size: A4 landscape; margin: 8mm; }
     .no-print { display: none !important; }
     #print-area { display: block !important; }
-    #print-area table { width: 100%; border-collapse: collapse; font-size: 6px; }
-    #print-area th, #print-area td { padding: 2px 1px !important; min-width: unset !important; border: 0.5px solid #ccc; }
-    #print-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; font-family: Arial; }
+    #print-area table { width: 100%; border-collapse: collapse; font-size: 6px; table-layout: fixed; }
+    #print-area th, #print-area td { padding: 1px !important; min-width: unset !important; width: auto; border: 0.5px solid #ccc; overflow: hidden; }
+    #print-area th:first-child, #print-area td:first-child { width: 80px; font-size: 6px; }
+    #print-title { font-size: 11px; font-weight: bold; margin-bottom: 3px; font-family: Arial; }
+    #print-area .no-print { display: none !important; }
   }
   @media screen {
     #print-area { display: none; }
