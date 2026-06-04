@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { MONTHS } from '@/lib/types'
 
-const PL_DAYS = ['Nd','Pn','Wt','Śr','Cz','Pt','So']
+const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 
 function getDow(mi: number, day: number) {
   const m = MONTHS[mi]
@@ -81,7 +81,7 @@ export default function SettingsPage() {
     const { data: schedule } = await supabase.from('schedules').select('id').eq('month', m.month).eq('year', m.year).single()
     if (!schedule) { setSaving(false); return }
     await supabase.from('schedule_limits').delete().eq('schedule_id', schedule.id).eq('stanowisko', selectedStan)
-    const toInsert = []
+    const toInsert: any[] = []
     for (let day = 1; day <= m.days; day++) {
       const lim = getLimit(monthIdx, day, selectedStan)
       if (lim.min > 0 || lim.max > 0) {
@@ -96,14 +96,15 @@ export default function SettingsPage() {
 
   function copyWeekdayToAll() {
     const m = MONTHS[monthIdx]
-    // Znajdź pierwszy poniedziałek (getDay() === 1)
-    const mondayLim = (() => {
-      for (let d = 1; d <= m.days; d++) {
-        if (getDow(monthIdx, d) === 1) return getLimit(monthIdx, d, selectedStan)
-      }
-      return { min: 0, max: 0 }
-    })()
     setLimits(prev => {
+      const mondayLim = (() => {
+        for (let d = 1; d <= m.days; d++) {
+          if (getDow(monthIdx, d) === 1) {
+            return prev[monthIdx]?.[`${d}_${selectedStan}`] || { min: 0, max: 0 }
+          }
+        }
+        return { min: 0, max: 0 }
+      })()
       const next = JSON.parse(JSON.stringify(prev))
       if (!next[monthIdx]) next[monthIdx] = {}
       for (let d = 1; d <= m.days; d++) {
@@ -115,14 +116,15 @@ export default function SettingsPage() {
 
   function copyWeekendToAll() {
     const m = MONTHS[monthIdx]
-    // Znajdź pierwszą sobotę (getDay() === 6)
-    const satLim = (() => {
-      for (let d = 1; d <= m.days; d++) {
-        if (getDow(monthIdx, d) === 6) return getLimit(monthIdx, d, selectedStan)
-      }
-      return { min: 0, max: 0 }
-    })()
     setLimits(prev => {
+      const satLim = (() => {
+        for (let d = 1; d <= m.days; d++) {
+          if (getDow(monthIdx, d) === 6) {
+            return prev[monthIdx]?.[`${d}_${selectedStan}`] || { min: 0, max: 0 }
+          }
+        }
+        return { min: 0, max: 0 }
+      })()
       const next = JSON.parse(JSON.stringify(prev))
       if (!next[monthIdx]) next[monthIdx] = {}
       for (let d = 1; d <= m.days; d++) {
@@ -133,7 +135,6 @@ export default function SettingsPage() {
   }
 
   const m = MONTHS[monthIdx]
-  const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#7dd3e8 100%)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontFamily:'Arial' }}>
