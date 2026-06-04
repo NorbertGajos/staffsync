@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { MONTHS } from '@/lib/types'
 
-const MONTH_START_DAYS = [0, 2, 5]
-const PL_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
+const PL_DAYS = ['Nd','Pn','Wt','Śr','Cz','Pt','So']
 
 function getDow(mi: number, day: number) {
-  return (MONTH_START_DAYS[mi] + day - 1) % 7
+  const m = MONTHS[mi]
+  return new Date(m.year, m.month - 1, day).getDay()
 }
 function isWeekend(mi: number, day: number) {
-  const d = getDow(mi, day); return d === 5 || d === 6
+  const d = getDow(mi, day)
+  return d === 0 || d === 6
+}
+function getMonthStartOffset(mi: number) {
+  const m = MONTHS[mi]
+  const dow = new Date(m.year, m.month - 1, 1).getDay()
+  return dow === 0 ? 6 : dow - 1
 }
 
 type Limits = Record<number, Record<string, { min: number, max: number }>>
@@ -90,8 +96,11 @@ export default function SettingsPage() {
 
   function copyWeekdayToAll() {
     const m = MONTHS[monthIdx]
+    // Znajdź pierwszy poniedziałek (getDay() === 1)
     const mondayLim = (() => {
-      for (let d = 1; d <= m.days; d++) { if (getDow(monthIdx, d) === 0) return getLimit(monthIdx, d, selectedStan) }
+      for (let d = 1; d <= m.days; d++) {
+        if (getDow(monthIdx, d) === 1) return getLimit(monthIdx, d, selectedStan)
+      }
       return { min: 0, max: 0 }
     })()
     setLimits(prev => {
@@ -106,8 +115,11 @@ export default function SettingsPage() {
 
   function copyWeekendToAll() {
     const m = MONTHS[monthIdx]
+    // Znajdź pierwszą sobotę (getDay() === 6)
     const satLim = (() => {
-      for (let d = 1; d <= m.days; d++) { if (getDow(monthIdx, d) === 5) return getLimit(monthIdx, d, selectedStan) }
+      for (let d = 1; d <= m.days; d++) {
+        if (getDow(monthIdx, d) === 6) return getLimit(monthIdx, d, selectedStan)
+      }
       return { min: 0, max: 0 }
     })()
     setLimits(prev => {
@@ -121,6 +133,7 @@ export default function SettingsPage() {
   }
 
   const m = MONTHS[monthIdx]
+  const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#7dd3e8 100%)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontFamily:'Arial' }}>
@@ -183,21 +196,23 @@ export default function SettingsPage() {
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
-            {PL_DAYS.map((d,i) => (
+            {PL_DAYS_HEADER.map((d,i) => (
               <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
             ))}
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'24px' }}>
-            {Array.from({ length: MONTH_START_DAYS[monthIdx] }, (_,i) => <div key={`e${i}`}/>)}
+            {Array.from({ length: getMonthStartOffset(monthIdx) }, (_,i) => <div key={`e${i}`}/>)}
             {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
               const we = isWeekend(monthIdx, day)
               const lim = getLimit(monthIdx, day, selectedStan)
               const hasLimit = lim.min > 0 || lim.max > 0
+              const dow = getDow(monthIdx, day)
+              const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
               return (
                 <div key={day} style={{ borderRadius:'12px', border:`2px solid ${we?'#fdd68a':'#ddeaf0'}`, background: we?'#fff8ec':(hasLimit?'#f0faf5':'#fafcfd'), padding:'8px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
                   <div style={{ fontWeight:700, fontSize:'12px', color: we?'#b87a00':'#064d61', lineHeight:1 }}>{day}</div>
-                  <div style={{ fontSize:'8px', color: we?'#b87a00':'#6b8a95', marginBottom:'2px' }}>{PL_DAYS[getDow(monthIdx,day)]}</div>
+                  <div style={{ fontSize:'8px', color: we?'#b87a00':'#6b8a95', marginBottom:'2px' }}>{dowLabel}</div>
                   <div style={{ width:'100%' }}>
                     <div style={{ fontSize:'8px', color:'#2d9e6b', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MIN</div>
                     <input type="number" min="0" value={lim.min} onChange={e=>setLimit(monthIdx, day, selectedStan, 'min', e.target.value)}
