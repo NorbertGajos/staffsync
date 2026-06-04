@@ -157,12 +157,16 @@ export default function SettingsPage() {
 
       <div style={{ padding:'20px', maxWidth:'900px', margin:'0 auto' }}>
 
-        <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
-          {MONTHS.map((mo,i) => (
-            <button key={i} onClick={()=>setMonthIdx(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
-              {mo.label}
-            </button>
-          ))}
+        <div style={{ marginBottom:'16px' }}>
+          <select
+            value={monthIdx}
+            onChange={e => setMonthIdx(Number(e.target.value))}
+            style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
+          >
+            {MONTHS.map((mo, i) => (
+              <option key={i} value={i}>{mo.label}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
