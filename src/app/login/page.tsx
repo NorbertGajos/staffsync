@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const [loginType, setLoginType] = useState<'email' | 'phone'>('email')
+  const [loginType, setLoginType] = useState<'email' | 'login'>('login')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [login, setLogin] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,15 +21,15 @@ export default function LoginPage() {
 
     let emailToUse = email.trim()
 
-    if (loginType === 'phone') {
-      const res = await fetch('/api/auth/get-email-by-phone', {
+    if (loginType === 'login') {
+      const res = await fetch('/api/auth/get-email-by-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone.trim() })
+        body: JSON.stringify({ login: login.trim().toLowerCase() })
       })
       const result = await res.json()
       if (result.error || !result.email) {
-        setError('Nie znaleziono konta z tym numerem telefonu')
+        setError('Nie znaleziono konta z tym loginem')
         setLoading(false)
         return
       }
@@ -99,7 +99,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* PRZEŁĄCZNIK EMAIL / TELEFON */}
         <div style={{
           display: 'flex',
           background: '#f0f6f8',
@@ -108,47 +107,42 @@ export default function LoginPage() {
           marginBottom: '24px',
           gap: '4px'
         }}>
-          <button
-            type="button"
-            onClick={() => setLoginType('email')}
-            style={{
-              flex: 1,
-              padding: '10px',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              background: loginType === 'email' ? '#0a6e8a' : 'transparent',
-              color: loginType === 'email' ? 'white' : '#6b8a95',
-              transition: 'all 0.2s'
-            }}
-          >
-            📧 Email
+          <button type="button" onClick={() => setLoginType('login')} style={{
+            flex: 1, padding: '10px', border: 'none', borderRadius: '10px',
+            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            background: loginType === 'login' ? '#0a6e8a' : 'transparent',
+            color: loginType === 'login' ? 'white' : '#6b8a95',
+            transition: 'all 0.2s'
+          }}>
+            👤 Login
           </button>
-          <button
-            type="button"
-            onClick={() => setLoginType('phone')}
-            style={{
-              flex: 1,
-              padding: '10px',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              background: loginType === 'phone' ? '#0a6e8a' : 'transparent',
-              color: loginType === 'phone' ? 'white' : '#6b8a95',
-              transition: 'all 0.2s'
-            }}
-          >
-            📱 Telefon
+          <button type="button" onClick={() => setLoginType('email')} style={{
+            flex: 1, padding: '10px', border: 'none', borderRadius: '10px',
+            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            background: loginType === 'email' ? '#0a6e8a' : 'transparent',
+            color: loginType === 'email' ? 'white' : '#6b8a95',
+            transition: 'all 0.2s'
+          }}>
+            📧 Email
           </button>
         </div>
 
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '16px' }}>
-            {loginType === 'email' ? (
+            {loginType === 'login' ? (
+              <>
+                <label style={labelStyle}>Login</label>
+                <input
+                  type="text"
+                  value={login}
+                  onChange={e => setLogin(e.target.value)}
+                  required
+                  placeholder="imie.nazwisko"
+                  style={inputStyle}
+                />
+                <p style={{ margin:'6px 0 0', fontSize:'12px', color:'#6b8a95' }}>np. jan.kowalski</p>
+              </>
+            ) : (
               <>
                 <label style={labelStyle}>Email</label>
                 <input
@@ -157,18 +151,6 @@ export default function LoginPage() {
                   onChange={e => setEmail(e.target.value)}
                   required
                   placeholder="twoj@email.pl"
-                  style={inputStyle}
-                />
-              </>
-            ) : (
-              <>
-                <label style={labelStyle}>Numer telefonu</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  required
-                  placeholder="+48 000 000 000"
                   style={inputStyle}
                 />
               </>
@@ -202,21 +184,13 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: loading ? '#6b8a95' : '#0a6e8a',
-              color: 'white',
-              border: 'none',
-              borderRadius: '100px',
-              fontSize: '15px',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
+          <button type="submit" disabled={loading} style={{
+            width: '100%', padding: '14px',
+            background: loading ? '#6b8a95' : '#0a6e8a',
+            color: 'white', border: 'none', borderRadius: '100px',
+            fontSize: '15px', fontWeight: 600,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}>
             {loading ? 'Logowanie...' : 'Zaloguj się →'}
           </button>
         </form>
