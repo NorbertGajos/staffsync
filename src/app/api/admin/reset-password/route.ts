@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth-check'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,9 @@ const supabaseAdmin = createClient(
 )
 
 export async function POST(request: Request) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Brak uprawnień' }, { status: 403 })
+
   try {
     const { user_id, new_password } = await request.json()
 
@@ -16,11 +20,8 @@ export async function POST(request: Request) {
       { password: new_password }
     )
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-    // Oznacz że hasło zostało zresetowane
     await supabaseAdmin
       .from('profiles')
       .update({ must_change_password: true })

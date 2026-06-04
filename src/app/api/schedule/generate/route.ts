@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth-check'
 
 const WEEKDAY_START = '10:00'
 const WEEKDAY_END = '18:00'
@@ -15,6 +16,9 @@ function isWeekend(year: number, month: number, day: number): boolean {
 }
 
 export async function POST(request: Request) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Brak uprawnień' }, { status: 403 })
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
