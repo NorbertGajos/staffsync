@@ -205,18 +205,24 @@ export default function SchedulePage() {
           <div style={{ color:'white', fontWeight:800, fontSize:'18px' }}>🗓 Grafik – {m.label}</div>
           <div style={{ color:'#7dd3e8', fontSize:'12px' }}>{isAdmin ? 'Kliknij komórkę aby przypisać zmianę' : 'Podgląd grafiku'}</div>
         </div>
-        {isAdmin && (
-          <div style={{ marginLeft:'auto', display:'flex', gap:'8px', flexWrap:'wrap' }}>
-            <button onClick={() => generateSchedule(false)} disabled={generating}
-              style={{ background: generating?'#6b8a95':'#2d9e6b', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
-              {generating ? '⏳ Generuję...' : '🤖 Generuj grafik'}
-            </button>
-            <button onClick={() => { if(confirm('Usunąć obecny grafik i wygenerować od nowa?')) generateSchedule(true) }} disabled={generating}
-              style={{ background:'transparent', border:'1.5px solid rgba(255,255,255,0.4)', color:'white', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
-              🔄 Od nowa
-            </button>
-          </div>
-        )}
+        <div style={{ marginLeft:'auto', display:'flex', gap:'8px', flexWrap:'wrap' }}>
+          {isAdmin && (
+            <>
+              <button onClick={() => generateSchedule(false)} disabled={generating}
+                style={{ background: generating?'#6b8a95':'#2d9e6b', color:'white', border:'none', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
+                {generating ? '⏳ Generuję...' : '🤖 Generuj grafik'}
+              </button>
+              <button onClick={() => { if(confirm('Usunąć obecny grafik i wygenerować od nowa?')) generateSchedule(true) }} disabled={generating}
+                style={{ background:'transparent', border:'1.5px solid rgba(255,255,255,0.4)', color:'white', padding:'10px 20px', borderRadius:'100px', cursor: generating?'not-allowed':'pointer', fontSize:'13px', fontWeight:600 }}>
+                🔄 Od nowa
+              </button>
+            </>
+          )}
+          <button onClick={() => window.print()}
+            style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'10px 20px', borderRadius:'100px', cursor:'pointer', fontSize:'13px', fontWeight:600 }}>
+            🖨️ Drukuj / PDF
+          </button>
+        </div>
       </div>
 
       <div style={{ padding:'20px', maxWidth:'1200px', margin:'0 auto' }}>
@@ -314,7 +320,6 @@ export default function SchedulePage() {
                         let fontWeight = 700
 
                         if (hasAvail && !hasShift) {
-                          // rezerwa
                           bg = '#e8f0f8'
                           color = '#6b8a95'
                           if (av?.all_day === false && av?.from_time) {
@@ -327,7 +332,6 @@ export default function SchedulePage() {
                         }
 
                         if (hasShift) {
-                          // zmiana przypisana - zawsze ptaszek
                           bg = we ? '#fdd68a' : '#eef4fb'
                           color = we ? '#7a5c00' : '#0a6e8a'
                           content = '✓'
