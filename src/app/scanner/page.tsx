@@ -154,7 +154,7 @@ export default function ScannerPage() {
         .eq('user_id', absentWorkerId).eq('date', date).single()
 
       if (absentShift) {
-        // Sprawdź czy nieobecny ma już rekord attendance
+        // Oznacz nieobecnego w attendance
         const { data: absentAtt } = await supabase
           .from('attendance').select('id')
           .eq('user_id', absentWorkerId).eq('date', date).single()
@@ -172,6 +172,12 @@ export default function ScannerPage() {
           })
         }
 
+        // Usuń zmianę nieobecnego z shifts
+        await supabase.from('shifts').delete()
+          .eq('user_id', absentWorkerId)
+          .eq('date', date)
+
+        // Dodaj zmianę zastępcy
         const { data: newShift } = await supabase.from('shifts').insert({
           user_id: scannedWorker.userId,
           date,
@@ -182,6 +188,7 @@ export default function ScannerPage() {
           schedule_id: absentShift.schedule_id,
         }).select().single()
 
+        // Zapisz obecność zastępcy
         await supabase.from('attendance').insert({
           user_id: scannedWorker.userId,
           date,
@@ -190,6 +197,7 @@ export default function ScannerPage() {
           status: 'zastepstwo',
         })
 
+        // Zapisz zastępstwo
         await supabase.from('substitutions').insert({
           date,
           substitute_user_id: scannedWorker.userId,
