@@ -18,6 +18,18 @@ function isWeekend(mi: number, day: number) {
 
 type BusinessHour = { day_of_week: number, open_time: string, close_time: string, is_open: boolean }
 
+const printStyles = `
+  @media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    body > * { display: none !important; }
+    #print-area { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+    #print-area table { width: 100%; border-collapse: collapse; font-size: 6px; }
+    #print-area th, #print-area td { padding: 2px 1px !important; min-width: unset !important; border: 0.5px solid #ccc; }
+    #print-area .no-print { display: none !important; }
+    #print-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; font-family: Arial; }
+  }
+`
+
 export default function SchedulePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [workers, setWorkers] = useState<Profile[]>([])
@@ -154,8 +166,103 @@ export default function SchedulePage() {
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#7dd3e8 100%)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontFamily:'Arial' }}>Ładowanie...</div>
   )
 
+  const tableContent = (
+    <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'600px' }}>
+      <thead>
+        <tr>
+          <th style={{ padding:'12px 16px', background:'#064d61', color:'white', textAlign:'left', fontSize:'13px', fontWeight:600, position:'sticky', left:0, zIndex:2, minWidth:'160px' }}>Pracownik</th>
+          {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
+            const dow = getDow(monthIdx, day)
+            const we = dow === 0 || dow === 6
+            const isSel = selectedDay === day
+            const dayLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
+            return (
+              <th key={day} onClick={() => setSelectedDay(isSel ? null : day)}
+                style={{ padding:'6px 2px', background: isSel?'#1a9bb8':(we?'#b87a00':'#064d61'), color:'white', textAlign:'center', fontSize:'10px', fontWeight:600, cursor:'pointer', minWidth:'42px' }}>
+                <div style={{ fontWeight:700 }}>{day}</div>
+                <div style={{ fontSize:'8px', opacity:0.8 }}>{dayLabel}</div>
+              </th>
+            )
+          })}
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(grouped).map(([stanowisko, group]) => (
+          <React.Fragment key={stanowisko}>
+            <tr>
+              <td colSpan={m.days + 1} style={{ padding:'8px 16px', background:'#eef4fb', color:'#064d61', fontWeight:700, fontSize:'11px', letterSpacing:'0.5px', textTransform:'uppercase' as const, borderTop:'2px solid #ddeaf0', borderBottom:'1px solid #ddeaf0' }}>
+                {stanowisko} · {group.length} {group.length === 1 ? 'osoba' : 'osoby/osób'}
+              </td>
+            </tr>
+            {group.map((w, wi) => (
+              <tr key={w.id} style={{ background: wi%2===0?'white':'#fafcfd' }}>
+                <td style={{ padding:'8px 16px', borderBottom:'1px solid #f0f4f8', position:'sticky', left:0, background: wi%2===0?'white':'#fafcfd', zIndex:1, minWidth:'160px' }}>
+                  <div style={{ fontWeight:600, fontSize:'13px', color:'#064d61' }}>{w.first_name} {w.last_name}</div>
+                  <div style={{ fontSize:'10px', color:'#6b8a95' }}>{Object.values(shifts[w.id] || {}).length} zmian</div>
+                </td>
+                {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
+                  const we = isWeekend(monthIdx, day)
+                  const hasShift = !!shifts[w.id]?.[day]
+                  const hasAvail = !!availability[w.id]?.[day]
+                  const av = availability[w.id]?.[day]
+                  const isSel = selectedDay === day
+
+                  let bg = '#ffeaea'
+                  let color = '#e8604c'
+                  let content = '✕'
+                  let fontSize = '11px'
+                  let fontWeight = 700
+
+                  if (hasAvail && !hasShift) {
+                    bg = '#e8f0f8'
+                    color = '#6b8a95'
+                    if (av?.all_day === false && av?.from_time) {
+                      content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
+                      fontSize = '8px'
+                    } else {
+                      content = 'R'
+                      fontSize = '11px'
+                    }
+                  }
+
+                  if (hasShift) {
+                    bg = we ? '#fdd68a' : '#eef4fb'
+                    color = we ? '#7a5c00' : '#0a6e8a'
+                    content = '✓'
+                    fontSize = '14px'
+                  }
+
+                  if (isSel) {
+                    bg = hasShift ? (we?'#f5a623':'#1a9bb8') : (hasAvail ? '#b0c4d8' : '#ffcccc')
+                    color = 'white'
+                  }
+
+                  return (
+                    <td key={day} onClick={() => isAdmin && openPopup(w.id, day)}
+                      style={{ padding:'3px 2px', borderBottom:'1px solid #f0f4f8', textAlign:'center', cursor: isAdmin?'pointer':'default' }}>
+                      <div style={{ borderRadius:'6px', padding:'3px 1px', background:bg, color, fontSize, fontWeight, minHeight:'34px', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s', lineHeight:1.2 }}>
+                        {content}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </React.Fragment>
+        ))}
+      </tbody>
+    </table>
+  )
+
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
+      <style>{printStyles}</style>
+
+      {/* UKRYTY OBSZAR DO DRUKU */}
+      <div id="print-area" style={{ display:'none' }}>
+        <div id="print-title">Grafik – {m.label} · Summer Playground</div>
+        {tableContent}
+      </div>
 
       {popup && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
@@ -199,7 +306,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
+      <div className="no-print" style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>← Wróć</button>
         <div>
           <div style={{ color:'white', fontWeight:800, fontSize:'18px' }}>🗓 Grafik – {m.label}</div>
@@ -225,7 +332,7 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      <div style={{ padding:'20px', maxWidth:'1200px', margin:'0 auto' }}>
+      <div className="no-print" style={{ padding:'20px', maxWidth:'1200px', margin:'0 auto' }}>
 
         {genResult && (
           <div style={{ background: genResult.error?'#fff0ee':'#d5f5e3', border:`1px solid ${genResult.error?'#e8604c':'#2d9e6b'}`, borderRadius:'14px', padding:'16px 20px', marginBottom:'16px' }}>
@@ -273,91 +380,7 @@ export default function SchedulePage() {
         </div>
 
         <div style={{ background:'white', borderRadius:'22px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)', overflow:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', minWidth:'600px' }}>
-            <thead>
-              <tr>
-                <th style={{ padding:'12px 16px', background:'#064d61', color:'white', textAlign:'left', fontSize:'13px', fontWeight:600, position:'sticky', left:0, zIndex:2, minWidth:'160px' }}>Pracownik</th>
-                {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
-                  const dow = getDow(monthIdx, day)
-                  const we = dow === 0 || dow === 6
-                  const isSel = selectedDay === day
-                  const dayLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
-                  return (
-                    <th key={day} onClick={() => setSelectedDay(isSel ? null : day)}
-                      style={{ padding:'6px 2px', background: isSel?'#1a9bb8':(we?'#b87a00':'#064d61'), color:'white', textAlign:'center', fontSize:'10px', fontWeight:600, cursor:'pointer', minWidth:'42px' }}>
-                      <div style={{ fontWeight:700 }}>{day}</div>
-                      <div style={{ fontSize:'8px', opacity:0.8 }}>{dayLabel}</div>
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(grouped).map(([stanowisko, group]) => (
-                <React.Fragment key={stanowisko}>
-                  <tr>
-                    <td colSpan={m.days + 1} style={{ padding:'8px 16px', background:'#eef4fb', color:'#064d61', fontWeight:700, fontSize:'11px', letterSpacing:'0.5px', textTransform:'uppercase' as const, borderTop:'2px solid #ddeaf0', borderBottom:'1px solid #ddeaf0' }}>
-                      🏷 {stanowisko} · {group.length} {group.length === 1 ? 'osoba' : 'osoby/osób'}
-                    </td>
-                  </tr>
-                  {group.map((w, wi) => (
-                    <tr key={w.id} style={{ background: wi%2===0?'white':'#fafcfd' }}>
-                      <td style={{ padding:'8px 16px', borderBottom:'1px solid #f0f4f8', position:'sticky', left:0, background: wi%2===0?'white':'#fafcfd', zIndex:1, minWidth:'160px' }}>
-                        <div style={{ fontWeight:600, fontSize:'13px', color:'#064d61' }}>{w.first_name} {w.last_name}</div>
-                        <div style={{ fontSize:'10px', color:'#6b8a95' }}>{Object.values(shifts[w.id] || {}).length} zmian</div>
-                      </td>
-                      {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
-                        const we = isWeekend(monthIdx, day)
-                        const hasShift = !!shifts[w.id]?.[day]
-                        const hasAvail = !!availability[w.id]?.[day]
-                        const av = availability[w.id]?.[day]
-                        const isSel = selectedDay === day
-
-                        let bg = '#ffeaea'
-                        let color = '#e8604c'
-                        let content = '✕'
-                        let fontSize = '11px'
-                        let fontWeight = 700
-
-                        if (hasAvail && !hasShift) {
-                          bg = '#e8f0f8'
-                          color = '#6b8a95'
-                          if (av?.all_day === false && av?.from_time) {
-                            content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
-                            fontSize = '8px'
-                          } else {
-                            content = 'R'
-                            fontSize = '11px'
-                          }
-                        }
-
-                        if (hasShift) {
-                          bg = we ? '#fdd68a' : '#eef4fb'
-                          color = we ? '#7a5c00' : '#0a6e8a'
-                          content = '✓'
-                          fontSize = '14px'
-                        }
-
-                        if (isSel) {
-                          bg = hasShift ? (we?'#f5a623':'#1a9bb8') : (hasAvail ? '#b0c4d8' : '#ffcccc')
-                          color = 'white'
-                        }
-
-                        return (
-                          <td key={day} onClick={() => isAdmin && openPopup(w.id, day)}
-                            style={{ padding:'3px 2px', borderBottom:'1px solid #f0f4f8', textAlign:'center', cursor: isAdmin?'pointer':'default' }}>
-                            <div style={{ borderRadius:'6px', padding:'3px 1px', background:bg, color, fontSize, fontWeight, minHeight:'34px', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.15s', lineHeight:1.2 }}>
-                              {content}
-                            </div>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+          {tableContent}
         </div>
 
         {selectedDay && (
