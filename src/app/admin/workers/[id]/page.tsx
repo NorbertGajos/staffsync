@@ -14,6 +14,8 @@ export default function EditWorkerPage() {
   const [resetting, setResetting] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [showReset, setShowReset] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [note, setNote] = useState('')
   const [authEmail, setAuthEmail] = useState('')
   const [msg, setMsg] = useState('')
@@ -63,7 +65,7 @@ export default function EditWorkerPage() {
   }, [params.id])
 
   async function handleDelete() {
-    if (!confirm(`Usunąć pracownika ${profile?.first_name} ${profile?.last_name}? Tej operacji nie można cofnąć!`)) return
+    setDeleting(true)
     const id = Array.isArray(params.id) ? params.id[0] : params.id
     await fetch('/api/admin/delete-user', {
       method: 'POST',
@@ -138,6 +140,39 @@ export default function EditWorkerPage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
 
+      {/* MODAL POTWIERDZENIA USUNIĘCIA */}
+      {showDeleteModal && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:'20px' }}>
+          <div style={{ background:'white', borderRadius:'24px', padding:'32px', maxWidth:'400px', width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.3)', textAlign:'center' }}>
+            <div style={{ fontSize:'56px', marginBottom:'16px' }}>🗑</div>
+            <h2 style={{ margin:'0 0 8px', color:'#064d61', fontSize:'20px', fontWeight:800 }}>
+              Usunąć pracownika?
+            </h2>
+            <p style={{ margin:'0 0 6px', fontSize:'16px', fontWeight:700, color:'#e8604c' }}>
+              {profile?.first_name} {profile?.last_name}
+            </p>
+            <p style={{ margin:'0 0 24px', fontSize:'13px', color:'#6b8a95', lineHeight:1.5 }}>
+              Ta operacja jest nieodwracalna. Wszystkie dane pracownika zostaną trwale usunięte z systemu.
+            </p>
+            <div style={{ display:'flex', gap:'10px' }}>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                style={{ flex:1, padding:'14px', background:'#f0f4f8', color:'#6b8a95', border:'none', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}
+              >
+                Anuluj
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ flex:1, padding:'14px', background: deleting?'#999':'#e8604c', color:'white', border:'none', borderRadius:'100px', cursor: deleting?'not-allowed':'pointer', fontSize:'14px', fontWeight:600 }}
+              >
+                {deleting ? 'Usuwanie...' : '🗑 Tak, usuń'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px' }}>
         <button onClick={()=>router.push('/admin/workers')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>
           ← Wróć
@@ -152,7 +187,6 @@ export default function EditWorkerPage() {
           </div>
         )}
 
-        {/* DANE PRACOWNIKA */}
         <div style={{ background:'white', borderRadius:'22px', padding:'28px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)', marginBottom:'16px' }}>
           <h2 style={{ margin:'0 0 24px', color:'#064d61', fontSize:'18px' }}>Dane pracownika</h2>
           <form onSubmit={handleSave}>
@@ -200,14 +234,13 @@ export default function EditWorkerPage() {
               <button type="button" onClick={()=>router.push('/admin/workers')} style={{ background:'transparent', color:'#0a6e8a', border:'2px solid #1a9bb8', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
                 Anuluj
               </button>
-              <button type="button" onClick={handleDelete} style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
+              <button type="button" onClick={() => setShowDeleteModal(true)} style={{ background:'#fff0ee', color:'#e8604c', border:'none', padding:'12px 28px', borderRadius:'100px', cursor:'pointer', fontSize:'14px', fontWeight:600 }}>
                 🗑 Usuń pracownika
               </button>
             </div>
           </form>
         </div>
 
-        {/* DANE LOGOWANIA */}
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginBottom:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <h3 style={{ margin:'0 0 12px', color:'#064d61', fontSize:'16px' }}>🔑 Dane logowania</h3>
           {profile?.login && (
@@ -222,7 +255,6 @@ export default function EditWorkerPage() {
           )}
         </div>
 
-        {/* RESET HASŁA */}
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginBottom:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showReset?'20px':'0' }}>
             <h3 style={{ margin:0, color:'#064d61', fontSize:'16px' }}>🔒 Reset hasła</h3>
@@ -241,7 +273,6 @@ export default function EditWorkerPage() {
           )}
         </div>
 
-        {/* NOTATKI */}
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <h3 style={{ margin:'0 0 12px', color:'#064d61', fontSize:'16px' }}>📝 Notatki o pracowniku</h3>
           <p style={{ margin:'0 0 12px', fontSize:'13px', color:'#6b8a95' }}>
