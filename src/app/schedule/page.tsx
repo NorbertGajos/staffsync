@@ -304,7 +304,6 @@ export default function SchedulePage() {
                         const we = isWeekend(monthIdx, day)
                         const hasShift = !!shifts[w.id]?.[day]
                         const hasAvail = !!availability[w.id]?.[day]
-                        const sh = shifts[w.id]?.[day]
                         const av = availability[w.id]?.[day]
                         const isSel = selectedDay === day
 
@@ -315,18 +314,24 @@ export default function SchedulePage() {
                         let fontWeight = 700
 
                         if (hasAvail && !hasShift) {
+                          // rezerwa
                           bg = '#e8f0f8'
                           color = '#6b8a95'
-                          content = 'R'
-                          fontSize = '11px'
+                          if (av?.all_day === false && av?.from_time) {
+                            content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
+                            fontSize = '8px'
+                          } else {
+                            content = 'R'
+                            fontSize = '11px'
+                          }
                         }
 
                         if (hasShift) {
+                          // zmiana przypisana - zawsze ptaszek
                           bg = we ? '#fdd68a' : '#eef4fb'
                           color = we ? '#7a5c00' : '#0a6e8a'
-                          // zawsze pokazuj godziny zmiany
-                          content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`
-                          fontSize = '8px'
+                          content = '✓'
+                          fontSize = '14px'
                         }
 
                         if (isSel) {
