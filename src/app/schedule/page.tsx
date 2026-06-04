@@ -254,11 +254,10 @@ export default function SchedulePage() {
 
         <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', marginBottom:'16px', fontSize:'12px' }}>
           {[
-            { bg:'#e8604c', color:'white', label:'Brak dyspozycji', content:'✕' },
+            { bg:'#ffeaea', color:'#e8604c', label:'Brak dyspozycji', content:'✕' },
             { bg:'#e8f0f8', color:'#6b8a95', label:'Rezerwa (zgłosił, nie wybrany)', content:'R' },
             { bg:'#eef4fb', color:'#0a6e8a', label:'Zmiana – dzień roboczy', content:'✓' },
             { bg:'#fdd68a', color:'#7a5c00', label:'Zmiana – weekend', content:'✓' },
-            { bg:'#0a6e8a', color:'white', label:'Zmiana przypisana (godziny)', content:'10-18' },
           ].map((l,i) => (
             <span key={i} style={{ display:'flex', alignItems:'center', gap:'5px', color:'white' }}>
               <span style={{ width:22, height:22, borderRadius:4, background:l.bg, display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:'9px', fontWeight:700, color:l.color, flexShrink:0 }}>{l.content}</span>
@@ -316,7 +315,6 @@ export default function SchedulePage() {
                         let fontWeight = 700
 
                         if (hasAvail && !hasShift) {
-                          // rezerwa - zgłosił ale system nie wybrał
                           bg = '#e8f0f8'
                           color = '#6b8a95'
                           content = 'R'
@@ -324,21 +322,11 @@ export default function SchedulePage() {
                         }
 
                         if (hasShift) {
-                          // zmiana przypisana
-                          if (we) {
-                            bg = '#fdd68a'
-                            color = '#7a5c00'
-                          } else {
-                            bg = '#eef4fb'
-                            color = '#0a6e8a'
-                          }
-                          if (sh.all_day === false && sh.start_time) {
-                            content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`
-                            fontSize = '8px'
-                          } else {
-                            content = '✓'
-                            fontSize = '14px'
-                          }
+                          bg = we ? '#fdd68a' : '#eef4fb'
+                          color = we ? '#7a5c00' : '#0a6e8a'
+                          // zawsze pokazuj godziny zmiany
+                          content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`
+                          fontSize = '8px'
                         }
 
                         if (isSel) {
