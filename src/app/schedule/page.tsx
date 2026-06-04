@@ -21,12 +21,14 @@ type BusinessHour = { day_of_week: number, open_time: string, close_time: string
 const printStyles = `
   @media print {
     @page { size: A4 landscape; margin: 8mm; }
-    body > * { display: none !important; }
-    #print-area { display: block !important; position: fixed; top: 0; left: 0; width: 100%; }
+    .no-print { display: none !important; }
+    #print-area { display: block !important; }
     #print-area table { width: 100%; border-collapse: collapse; font-size: 6px; }
     #print-area th, #print-area td { padding: 2px 1px !important; min-width: unset !important; border: 0.5px solid #ccc; }
-    #print-area .no-print { display: none !important; }
     #print-title { font-size: 12px; font-weight: bold; margin-bottom: 4px; font-family: Arial; }
+  }
+  @media screen {
+    #print-area { display: none; }
   }
 `
 
@@ -258,14 +260,13 @@ export default function SchedulePage() {
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
       <style>{printStyles}</style>
 
-      {/* UKRYTY OBSZAR DO DRUKU */}
-      <div id="print-area" style={{ display:'none' }}>
+      <div id="print-area">
         <div id="print-title">Grafik – {m.label} · Summer Playground</div>
         {tableContent}
       </div>
 
       {popup && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
+        <div className="no-print" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
           <div style={{ background:'white', borderRadius:'20px', padding:'28px', width:'320px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
             <h3 style={{ margin:'0 0 6px', color:'#064d61', fontSize:'17px' }}>✏️ Zmiana – dzień {popup.day}</h3>
             <p style={{ margin:'0 0 16px', fontSize:'13px', color:'#6b8a95' }}>
