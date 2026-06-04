@@ -322,20 +322,16 @@ export default function SchedulePage() {
                         let fontSize = '9px'
 
                         if (hasAvail && !hasShift) {
-                          if (we) {
-                            bg = '#fdd68a'
-                            color = '#7a5c00'
-                          } else {
-                            bg = '#eef4fb'
-                            color = '#0a6e8a'
-                          }
+                          bg = we ? '#fdd68a' : '#eef4fb'
+                          color = we ? '#7a5c00' : '#0a6e8a'
                           if (av?.all_day === false && av?.from_time) {
+                            // konkretne godziny wpisane przez pracownika
                             content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
                             fontSize = '8px'
                           } else {
-                            // cały dzień - pokaż godziny firmy
-                            content = getBusinessHours(monthIdx, day)
-                            fontSize = content === '✓' ? '12px' : '8px'
+                            // cały dzień - pokaż ptaszek
+                            content = '✓'
+                            fontSize = '12px'
                           }
                         }
 
