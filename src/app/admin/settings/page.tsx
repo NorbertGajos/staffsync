@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase'
 import { MONTHS } from '@/lib/types'
 
 const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
+const PL_DAYS_FULL = ['Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota','Niedziela']
+const DAY_ORDER = [1,2,3,4,5,6,0] // Pn=1, Wt=2, ... So=6, Nd=0
 
 function getDow(mi: number, day: number) {
   const m = MONTHS[mi]
@@ -22,8 +24,10 @@ function getMonthStartOffset(mi: number) {
 }
 
 type Limits = Record<number, Record<string, { min: number, max: number }>>
+type BusinessHour = { id: string, day_of_week: number, open_time: string, close_time: string, is_open: boolean }
 
 export default function SettingsPage() {
+  const [tab, setTab] = useState<'limits' | 'hours'>('limits')
   const [monthIdx, setMonthIdx] = useState(0)
   const [limits, setLimits] = useState<Limits>({})
   const [stanowiska, setStanowiska] = useState<string[]>([])
@@ -31,6 +35,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [selectedStan, setSelectedStan] = useState<string>('')
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([])
+  const [savingHours, setSavingHours] = useState(false)
+  const [savedHours, setSavedHours] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -56,6 +63,10 @@ export default function SettingsPage() {
       map[mi][`${l.day_of_month}_${l.stanowisko}`] = { min: l.min_workers, max: l.max_workers }
     })
     setLimits(map)
+
+    const { data: bh } = await supabase.from('business_hours').select('*').order('day_of_week')
+    setBusinessHours(bh || [])
+
     setLoading(false)
   }
 
@@ -134,6 +145,26 @@ export default function SettingsPage() {
     })
   }
 
+  function updateBusinessHour(dayOfWeek: number, field: 'open_time' | 'close_time' | 'is_open', val: any) {
+    setBusinessHours(prev => prev.map(bh =>
+      bh.day_of_week === dayOfWeek ? { ...bh, [field]: val } : bh
+    ))
+  }
+
+  async function saveBusinessHours() {
+    setSavingHours(true)
+    for (const bh of businessHours) {
+      await supabase.from('business_hours').update({
+        open_time: bh.open_time,
+        close_time: bh.close_time,
+        is_open: bh.is_open
+      }).eq('id', bh.id)
+    }
+    setSavingHours(false)
+    setSavedHours(true)
+    setTimeout(() => setSavedHours(false), 3000)
+  }
+
   const m = MONTHS[monthIdx]
 
   if (loading) return (
@@ -150,93 +181,163 @@ export default function SettingsPage() {
           ← Wróć
         </button>
         <div>
-          <div style={{ color:'white', fontWeight:800, fontSize:'18px' }}>⚙️ Limity stanowisk</div>
-          <div style={{ color:'#7dd3e8', fontSize:'12px' }}>Ustaw min/max pracowników per stanowisko per dzień</div>
+          <div style={{ color:'white', fontWeight:800, fontSize:'18px' }}>⚙️ Ustawienia</div>
+          <div style={{ color:'#7dd3e8', fontSize:'12px' }}>Limity stanowisk i godziny pracy</div>
         </div>
       </div>
 
       <div style={{ padding:'20px', maxWidth:'900px', margin:'0 auto' }}>
 
-        <div style={{ marginBottom:'16px' }}>
-          <select
-            value={monthIdx}
-            onChange={e => setMonthIdx(Number(e.target.value))}
-            style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
-          >
-            {MONTHS.map((mo, i) => (
-              <option key={i} value={i}>{mo.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
-
-          {saved && (
-            <div style={{ background:'#d5f5e3', border:'1px solid #2d9e6b', borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', color:'#1a5e3a', fontSize:'14px', fontWeight:500 }}>
-              ✅ Limity zapisane!
-            </div>
-          )}
-
-          <div style={{ marginBottom:'20px' }}>
-            <label style={{ display:'block', fontSize:'11px', fontWeight:600, color:'#6b8a95', textTransform:'uppercase' as const, letterSpacing:'0.5px', marginBottom:'8px' }}>
-              Wybierz stanowisko
-            </label>
-            <select value={selectedStan} onChange={e=>setSelectedStan(e.target.value)}
-              style={{ width:'100%', padding:'12px', border:'2px solid #ddeaf0', borderRadius:'12px', fontSize:'14px', color:'#1a2c35', outline:'none', background:'white' }}>
-              {stanowiska.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          <div style={{ background:'#fff8ec', border:'1.5px solid #fdd68a', borderRadius:'12px', padding:'12px 16px', marginBottom:'20px', fontSize:'13px', color:'#7a5c00' }}>
-            💡 <strong>Min</strong> = minimalna obsada · <strong>Max</strong> = limit (blokuje zapisy) · <strong>0</strong> = brak limitu
-          </div>
-
-          <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
-            <button onClick={copyWeekdayToAll} style={{ background:'#eef4fb', color:'#0a6e8a', border:'none', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'12px', fontWeight:600 }}>
-              📋 Kopiuj Pn → wszystkie dni robocze
-            </button>
-            <button onClick={copyWeekendToAll} style={{ background:'#fff8ec', color:'#b87a00', border:'none', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'12px', fontWeight:600 }}>
-              📋 Kopiuj So → wszystkie weekendy
-            </button>
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
-            {PL_DAYS_HEADER.map((d,i) => (
-              <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
-            ))}
-          </div>
-
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'24px' }}>
-            {Array.from({ length: getMonthStartOffset(monthIdx) }, (_,i) => <div key={`e${i}`}/>)}
-            {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
-              const we = isWeekend(monthIdx, day)
-              const lim = getLimit(monthIdx, day, selectedStan)
-              const hasLimit = lim.min > 0 || lim.max > 0
-              const dow = getDow(monthIdx, day)
-              const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
-              return (
-                <div key={day} style={{ borderRadius:'12px', border:`2px solid ${we?'#fdd68a':'#ddeaf0'}`, background: we?'#fff8ec':(hasLimit?'#f0faf5':'#fafcfd'), padding:'8px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
-                  <div style={{ fontWeight:700, fontSize:'12px', color: we?'#b87a00':'#064d61', lineHeight:1 }}>{day}</div>
-                  <div style={{ fontSize:'8px', color: we?'#b87a00':'#6b8a95', marginBottom:'2px' }}>{dowLabel}</div>
-                  <div style={{ width:'100%' }}>
-                    <div style={{ fontSize:'8px', color:'#2d9e6b', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MIN</div>
-                    <input type="number" min="0" value={lim.min} onChange={e=>setLimit(monthIdx, day, selectedStan, 'min', e.target.value)}
-                      style={{ width:'100%', padding:'3px', border:'1.5px solid #a5d6a7', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
-                  </div>
-                  <div style={{ width:'100%' }}>
-                    <div style={{ fontSize:'8px', color:'#0a6e8a', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MAX</div>
-                    <input type="number" min="0" value={lim.max} onChange={e=>setLimit(monthIdx, day, selectedStan, 'max', e.target.value)}
-                      style={{ width:'100%', padding:'3px', border:'1.5px solid #ddeaf0', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <button onClick={handleSave} disabled={saving} style={{ width:'100%', padding:'14px', background: saving?'#6b8a95':'#0a6e8a', color:'white', border:'none', borderRadius:'100px', fontSize:'15px', fontWeight:600, cursor: saving?'not-allowed':'pointer' }}>
-            {saving ? 'Zapisywanie...' : `💾 Zapisz limity – ${selectedStan} – ${m.label}`}
+        <div style={{ display:'flex', gap:'8px', marginBottom:'20px' }}>
+          <button onClick={()=>setTab('limits')} style={{ padding:'10px 24px', borderRadius:'100px', border:'none', background: tab==='limits'?'white':'rgba(255,255,255,0.2)', color: tab==='limits'?'#064d61':'white', fontWeight:600, fontSize:'14px', cursor:'pointer' }}>
+            📊 Limity stanowisk
+          </button>
+          <button onClick={()=>setTab('hours')} style={{ padding:'10px 24px', borderRadius:'100px', border:'none', background: tab==='hours'?'white':'rgba(255,255,255,0.2)', color: tab==='hours'?'#064d61':'white', fontWeight:600, fontSize:'14px', cursor:'pointer' }}>
+            🕐 Godziny pracy
           </button>
         </div>
+
+        {tab === 'limits' && (
+          <>
+            <div style={{ marginBottom:'16px' }}>
+              <select
+                value={monthIdx}
+                onChange={e => setMonthIdx(Number(e.target.value))}
+                style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
+              >
+                {MONTHS.map((mo, i) => (
+                  <option key={i} value={i}>{mo.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
+
+              {saved && (
+                <div style={{ background:'#d5f5e3', border:'1px solid #2d9e6b', borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', color:'#1a5e3a', fontSize:'14px', fontWeight:500 }}>
+                  ✅ Limity zapisane!
+                </div>
+              )}
+
+              <div style={{ marginBottom:'20px' }}>
+                <label style={{ display:'block', fontSize:'11px', fontWeight:600, color:'#6b8a95', textTransform:'uppercase' as const, letterSpacing:'0.5px', marginBottom:'8px' }}>
+                  Wybierz stanowisko
+                </label>
+                <select value={selectedStan} onChange={e=>setSelectedStan(e.target.value)}
+                  style={{ width:'100%', padding:'12px', border:'2px solid #ddeaf0', borderRadius:'12px', fontSize:'14px', color:'#1a2c35', outline:'none', background:'white' }}>
+                  {stanowiska.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div style={{ background:'#fff8ec', border:'1.5px solid #fdd68a', borderRadius:'12px', padding:'12px 16px', marginBottom:'20px', fontSize:'13px', color:'#7a5c00' }}>
+                💡 <strong>Min</strong> = minimalna obsada · <strong>Max</strong> = limit (blokuje zapisy) · <strong>0</strong> = brak limitu
+              </div>
+
+              <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
+                <button onClick={copyWeekdayToAll} style={{ background:'#eef4fb', color:'#0a6e8a', border:'none', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'12px', fontWeight:600 }}>
+                  📋 Kopiuj Pn → wszystkie dni robocze
+                </button>
+                <button onClick={copyWeekendToAll} style={{ background:'#fff8ec', color:'#b87a00', border:'none', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'12px', fontWeight:600 }}>
+                  📋 Kopiuj So → wszystkie weekendy
+                </button>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
+                {PL_DAYS_HEADER.map((d,i) => (
+                  <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
+                ))}
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'24px' }}>
+                {Array.from({ length: getMonthStartOffset(monthIdx) }, (_,i) => <div key={`e${i}`}/>)}
+                {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
+                  const we = isWeekend(monthIdx, day)
+                  const lim = getLimit(monthIdx, day, selectedStan)
+                  const hasLimit = lim.min > 0 || lim.max > 0
+                  const dow = getDow(monthIdx, day)
+                  const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
+                  return (
+                    <div key={day} style={{ borderRadius:'12px', border:`2px solid ${we?'#fdd68a':'#ddeaf0'}`, background: we?'#fff8ec':(hasLimit?'#f0faf5':'#fafcfd'), padding:'8px 4px', display:'flex', flexDirection:'column', alignItems:'center', gap:'4px' }}>
+                      <div style={{ fontWeight:700, fontSize:'12px', color: we?'#b87a00':'#064d61', lineHeight:1 }}>{day}</div>
+                      <div style={{ fontSize:'8px', color: we?'#b87a00':'#6b8a95', marginBottom:'2px' }}>{dowLabel}</div>
+                      <div style={{ width:'100%' }}>
+                        <div style={{ fontSize:'8px', color:'#2d9e6b', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MIN</div>
+                        <input type="number" min="0" value={lim.min} onChange={e=>setLimit(monthIdx, day, selectedStan, 'min', e.target.value)}
+                          style={{ width:'100%', padding:'3px', border:'1.5px solid #a5d6a7', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
+                      </div>
+                      <div style={{ width:'100%' }}>
+                        <div style={{ fontSize:'8px', color:'#0a6e8a', fontWeight:600, textAlign:'center', marginBottom:'1px' }}>MAX</div>
+                        <input type="number" min="0" value={lim.max} onChange={e=>setLimit(monthIdx, day, selectedStan, 'max', e.target.value)}
+                          style={{ width:'100%', padding:'3px', border:'1.5px solid #ddeaf0', borderRadius:'6px', fontSize:'11px', textAlign:'center', outline:'none', color:'#1a2c35' }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button onClick={handleSave} disabled={saving} style={{ width:'100%', padding:'14px', background: saving?'#6b8a95':'#0a6e8a', color:'white', border:'none', borderRadius:'100px', fontSize:'15px', fontWeight:600, cursor: saving?'not-allowed':'pointer' }}>
+                {saving ? 'Zapisywanie...' : `💾 Zapisz limity – ${selectedStan} – ${m.label}`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {tab === 'hours' && (
+          <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
+
+            {savedHours && (
+              <div style={{ background:'#d5f5e3', border:'1px solid #2d9e6b', borderRadius:'12px', padding:'12px 16px', marginBottom:'16px', color:'#1a5e3a', fontSize:'14px', fontWeight:500 }}>
+                ✅ Godziny pracy zapisane!
+              </div>
+            )}
+
+            <div style={{ background:'#fff8ec', border:'1.5px solid #fdd68a', borderRadius:'12px', padding:'12px 16px', marginBottom:'24px', fontSize:'13px', color:'#7a5c00' }}>
+              💡 Godziny pracy są używane jako domyślne gdy pracownik zaznacza "cały dzień" dostępności
+            </div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'24px' }}>
+              {DAY_ORDER.map(dow => {
+                const bh = businessHours.find(h => h.day_of_week === dow)
+                if (!bh) return null
+                const isWe = dow === 0 || dow === 6
+                const dayName = PL_DAYS_FULL[dow === 0 ? 6 : dow - 1]
+                return (
+                  <div key={dow} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'14px 16px', borderRadius:'14px', border:`2px solid ${isWe?'#fdd68a':'#ddeaf0'}`, background: isWe?'#fff8ec':'#fafcfd' }}>
+                    <div style={{ width:'120px', fontWeight:700, fontSize:'14px', color: isWe?'#b87a00':'#064d61' }}>
+                      {dayName}
+                    </div>
+                    <label style={{ display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontSize:'13px', color:'#6b8a95' }}>
+                      <input type="checkbox" checked={bh.is_open} onChange={e => updateBusinessHour(dow, 'is_open', e.target.checked)}
+                        style={{ width:'16px', height:'16px', cursor:'pointer' }} />
+                      Otwarte
+                    </label>
+                    {bh.is_open && (
+                      <>
+                        <div style={{ display:'flex', alignItems:'center', gap:'8px', marginLeft:'8px' }}>
+                          <span style={{ fontSize:'12px', color:'#6b8a95', fontWeight:600 }}>Od</span>
+                          <input type="time" value={bh.open_time.slice(0,5)} onChange={e => updateBusinessHour(dow, 'open_time', e.target.value)}
+                            style={{ padding:'6px 10px', border:'2px solid #ddeaf0', borderRadius:'8px', fontSize:'13px', color:'#1a2c35', outline:'none' }} />
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+                          <span style={{ fontSize:'12px', color:'#6b8a95', fontWeight:600 }}>Do</span>
+                          <input type="time" value={bh.close_time.slice(0,5)} onChange={e => updateBusinessHour(dow, 'close_time', e.target.value)}
+                            style={{ padding:'6px 10px', border:'2px solid #ddeaf0', borderRadius:'8px', fontSize:'13px', color:'#1a2c35', outline:'none' }} />
+                        </div>
+                      </>
+                    )}
+                    {!bh.is_open && (
+                      <span style={{ fontSize:'13px', color:'#e8604c', fontWeight:600, marginLeft:'8px' }}>Zamknięte</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            <button onClick={saveBusinessHours} disabled={savingHours} style={{ width:'100%', padding:'14px', background: savingHours?'#6b8a95':'#0a6e8a', color:'white', border:'none', borderRadius:'100px', fontSize:'15px', fontWeight:600, cursor: savingHours?'not-allowed':'pointer' }}>
+              {savingHours ? 'Zapisywanie...' : '💾 Zapisz godziny pracy'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
