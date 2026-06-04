@@ -5,16 +5,21 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Profile, MONTHS } from '@/lib/types'
 
-const PL_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
-const MONTH_START_DAYS = [0, 2, 5]
+const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 const HOURS = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00']
 
-function getDow(monthIdx: number, day: number) {
-  return (MONTH_START_DAYS[monthIdx] + day - 1) % 7
+function getDow(mi: number, day: number) {
+  const m = MONTHS[mi]
+  return new Date(m.year, m.month - 1, day).getDay()
 }
-function isWeekend(monthIdx: number, day: number) {
-  const d = getDow(monthIdx, day)
-  return d === 5 || d === 6
+function isWeekend(mi: number, day: number) {
+  const d = getDow(mi, day)
+  return d === 0 || d === 6
+}
+function getMonthStartOffset(mi: number) {
+  const m = MONTHS[mi]
+  const dow = new Date(m.year, m.month - 1, 1).getDay()
+  return dow === 0 ? 6 : dow - 1
 }
 
 type DayData = { type: 'allday' } | { type: 'hours', from: string, to: string } | null
@@ -73,15 +78,12 @@ export default function AvailabilityPage() {
   function handleDayClick(day: number) {
     const current = days[day]
     if (!current) {
-      // Nie zaznaczony – zaznacz cały dzień
       setDays(prev => ({ ...prev, [day]: { type: 'allday' } }))
     } else if (current.type === 'allday') {
-      // Cały dzień → otwórz popup z godzinami
       setPopupFrom('10:00')
       setPopupTo('18:00')
       setPopup(day)
     } else {
-      // Godziny → otwórz popup do edycji
       setPopupFrom(current.from)
       setPopupTo(current.to)
       setPopup(day)
@@ -158,17 +160,14 @@ export default function AvailabilityPage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
 
-      {/* POPUP GODZINY */}
       {popup !== null && (
         <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }}>
           <div style={{ background:'white', borderRadius:'20px', padding:'28px', width:'320px', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}>
             <h3 style={{ margin:'0 0 20px', color:'#064d61', fontSize:'17px' }}>
               📅 Dzień {popup} — {MONTHS[monthIdx].label}
             </h3>
-            <button
-              onClick={() => handleSetAllDay(popup)}
-              style={{ width:'100%', padding:'12px', background:'#0a6e8a', color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:600, cursor:'pointer', marginBottom:'12px' }}
-            >
+            <button onClick={() => handleSetAllDay(popup)}
+              style={{ width:'100%', padding:'12px', background:'#0a6e8a', color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:600, cursor:'pointer', marginBottom:'12px' }}>
               ✅ Cały dzień (domyślne godziny)
             </button>
             <div style={{ border:'2px solid #ddeaf0', borderRadius:'12px', padding:'16px', marginBottom:'12px' }}>
@@ -189,24 +188,19 @@ export default function AvailabilityPage() {
                   </select>
                 </div>
               </div>
-              <button
-                onClick={handleSetHours}
-                style={{ width:'100%', padding:'10px', background:'#f5a623', color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:600, cursor:'pointer', marginTop:'12px' }}
-              >
+              <button onClick={handleSetHours}
+                style={{ width:'100%', padding:'10px', background:'#f5a623', color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:600, cursor:'pointer', marginTop:'12px' }}>
                 ⏰ Ustaw godziny
               </button>
             </div>
-            <button
-              onClick={() => setPopup(null)}
-              style={{ width:'100%', padding:'10px', background:'transparent', color:'#6b8a95', border:'2px solid #ddeaf0', borderRadius:'10px', fontSize:'13px', cursor:'pointer' }}
-            >
+            <button onClick={() => setPopup(null)}
+              style={{ width:'100%', padding:'10px', background:'transparent', color:'#6b8a95', border:'2px solid #ddeaf0', borderRadius:'10px', fontSize:'13px', cursor:'pointer' }}>
               Anuluj
             </button>
           </div>
         </div>
       )}
 
-      {/* HEADER */}
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px' }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>
           ← Wróć
@@ -219,13 +213,16 @@ export default function AvailabilityPage() {
 
       <div style={{ padding:'20px', maxWidth:'860px', margin:'0 auto' }}>
 
-        {/* MONTH TABS */}
-        <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
-          {MONTHS.map((mo,i) => (
-            <button key={i} onClick={()=>switchMonth(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
-              {mo.label}
-            </button>
-          ))}
+        <div style={{ marginBottom:'20px' }}>
+          <select
+            value={monthIdx}
+            onChange={e => switchMonth(Number(e.target.value))}
+            style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
+          >
+            {MONTHS.map((mo, i) => (
+              <option key={i} value={i}>{mo.label}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ background:'white', borderRadius:'22px', padding:'26px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
@@ -249,33 +246,32 @@ export default function AvailabilityPage() {
             </div>
           </div>
 
-          {/* LEGENDA */}
           <div style={{ display:'flex', gap:'16px', marginBottom:'16px', fontSize:'12px', flexWrap:'wrap' }}>
             <span style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-              <span style={{ width:16, height:16, borderRadius:4, background:'#0a6e8a', display:'inline-block' }}/>
-              Cały dzień
+              <span style={{ width:16, height:16, borderRadius:4, background:'#0a6e8a', display:'inline-block' }}/> Cały dzień
             </span>
             <span style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-              <span style={{ width:16, height:16, borderRadius:4, background:'#f5a623', display:'inline-block' }}/>
-              Konkretne godziny
+              <span style={{ width:16, height:16, borderRadius:4, background:'#f5a623', display:'inline-block' }}/> Konkretne godziny
             </span>
             <span style={{ color:'#6b8a95' }}>1. klik = zaznacz · 2. klik = zmień godziny · ✕ = usuń</span>
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
-            {PL_DAYS.map((d,i) => (
+            {PL_DAYS_HEADER.map((d,i) => (
               <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
             ))}
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px', marginBottom:'24px' }}>
-            {Array.from({ length: MONTH_START_DAYS[monthIdx] }, (_,i) => <div key={`e${i}`}/>)}
+            {Array.from({ length: getMonthStartOffset(monthIdx) }, (_,i) => <div key={`e${i}`}/>)}
             {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
               const we = isWeekend(monthIdx, day)
               const data = days[day]
               const isAllDay = data?.type === 'allday'
               const isHours = data?.type === 'hours'
               const sel = !!data
+              const dow = getDow(monthIdx, day)
+              const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
 
               let bg = we ? '#fff8ec' : '#fafcfd'
               if (isAllDay) bg = we ? '#f5a623' : '#0a6e8a'
@@ -286,20 +282,17 @@ export default function AvailabilityPage() {
 
               return (
                 <div key={day} style={{ position:'relative' }}>
-                  <button
-                    onClick={()=>handleDayClick(day)}
-                    style={{
-                      width:'100%', aspectRatio:'1', borderRadius:'10px',
-                      border: sel ? 'none' : `2px solid ${we?'#fdd68a':'#ddeaf0'}`,
-                      background: bg, cursor:'pointer',
-                      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'1px',
-                      transform: sel?'scale(1.06)':'scale(1)',
-                      boxShadow: sel?'0 4px 12px rgba(10,110,138,0.28)':'none', padding:0,
-                    }}
-                  >
+                  <button onClick={()=>handleDayClick(day)} style={{
+                    width:'100%', aspectRatio:'1', borderRadius:'10px',
+                    border: sel ? 'none' : `2px solid ${we?'#fdd68a':'#ddeaf0'}`,
+                    background: bg, cursor:'pointer',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'1px',
+                    transform: sel?'scale(1.06)':'scale(1)',
+                    boxShadow: sel?'0 4px 12px rgba(10,110,138,0.28)':'none', padding:0,
+                  }}>
                     <span style={{ fontWeight:700, fontSize:'13px', color:textColor, lineHeight:1 }}>{day}</span>
                     <span style={{ fontSize:'7px', fontWeight:600, color: sel?'rgba(255,255,255,0.8)':(we?'#b87a00':'#6b8a95') }}>
-                      {PL_DAYS[getDow(monthIdx,day)]}
+                      {dowLabel}
                     </span>
                     {isHours && data.type === 'hours' && (
                       <span style={{ fontSize:'6px', color:'rgba(255,255,255,0.9)', fontWeight:700, lineHeight:1 }}>
@@ -308,12 +301,11 @@ export default function AvailabilityPage() {
                     )}
                   </button>
                   {sel && (
-                    <button
-                      onClick={(e)=>handleRemoveDay(day,e)}
-                      style={{ position:'absolute', top:-4, right:-4, width:16, height:16, borderRadius:'50%', background:'#e8604c', border:'2px solid white', color:'white', fontSize:'9px', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, lineHeight:1 }}
-                    >
-                      ✕
-                    </button>
+                    <button onClick={(e)=>handleRemoveDay(day,e)} style={{
+                      position:'absolute', top:-4, right:-4, width:16, height:16, borderRadius:'50%',
+                      background:'#e8604c', border:'2px solid white', color:'white', fontSize:'9px',
+                      fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, lineHeight:1
+                    }}>✕</button>
                   )}
                 </div>
               )

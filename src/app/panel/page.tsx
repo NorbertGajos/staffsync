@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Profile, MONTHS } from '@/lib/types'
 
-const PL_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
-const MONTH_START_DAYS = [0, 2, 5]
+const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 
 function getDow(mi: number, day: number) {
-  return (MONTH_START_DAYS[mi] + day - 1) % 7
+  const m = MONTHS[mi]
+  return new Date(m.year, m.month - 1, day).getDay()
 }
 function isWeekend(mi: number, day: number) {
-  const d = getDow(mi, day); return d === 5 || d === 6
+  const d = getDow(mi, day)
+  return d === 0 || d === 6
+}
+function getMonthStartOffset(mi: number) {
+  const m = MONTHS[mi]
+  const dow = new Date(m.year, m.month - 1, 1).getDay()
+  return dow === 0 ? 6 : dow - 1
 }
 
 export default function PanelPage() {
@@ -42,37 +48,19 @@ export default function PanelPage() {
     const from = `${m.year}-${String(m.month).padStart(2,'0')}-01`
     const to = `${m.year}-${String(m.month).padStart(2,'0')}-${String(m.days).padStart(2,'0')}`
 
-    // Dostępność
-    const { data: avail } = await supabase
-      .from('availability').select('*')
-      .eq('user_id', userId).gte('date', from).lte('date', to)
+    const { data: avail } = await supabase.from('availability').select('*').eq('user_id', userId).gte('date', from).lte('date', to)
     const availMap: Record<number, any> = {}
-    avail?.forEach(a => {
-      const day = parseInt(a.date.split('-')[2])
-      availMap[day] = a
-    })
+    avail?.forEach(a => { availMap[parseInt(a.date.split('-')[2])] = a })
     setAvailability(availMap)
 
-    // Zmiany w grafiku
-    const { data: sh } = await supabase
-      .from('shifts').select('*')
-      .eq('user_id', userId).gte('date', from).lte('date', to)
+    const { data: sh } = await supabase.from('shifts').select('*').eq('user_id', userId).gte('date', from).lte('date', to)
     const shMap: Record<number, any> = {}
-    sh?.forEach(s => {
-      const day = parseInt(s.date.split('-')[2])
-      shMap[day] = s
-    })
+    sh?.forEach(s => { shMap[parseInt(s.date.split('-')[2])] = s })
     setShifts(shMap)
 
-    // Obecność
-    const { data: att } = await supabase
-      .from('attendance').select('*')
-      .eq('user_id', userId).gte('date', from).lte('date', to)
+    const { data: att } = await supabase.from('attendance').select('*').eq('user_id', userId).gte('date', from).lte('date', to)
     const attMap: Record<number, any> = {}
-    att?.forEach(a => {
-      const day = parseInt(a.date.split('-')[2])
-      attMap[day] = a
-    })
+    att?.forEach(a => { attMap[parseInt(a.date.split('-')[2])] = a })
     setAttendance(attMap)
   }
 
@@ -98,7 +86,6 @@ export default function PanelPage() {
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#1a9bb8 38%,#7dd3e8 68%,#f5ede0 100%)', fontFamily:'Arial' }}>
 
-      {/* HEADER */}
       <div style={{ background:'#064d61', padding:'16px 24px', display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
         <button onClick={()=>router.push('/dashboard')} style={{ background:'rgba(255,255,255,0.15)', border:'1.5px solid rgba(255,255,255,0.3)', color:'white', padding:'8px 16px', borderRadius:'100px', cursor:'pointer', fontSize:'13px' }}>
           ← Wróć
@@ -111,16 +98,18 @@ export default function PanelPage() {
 
       <div style={{ padding:'20px', maxWidth:'860px', margin:'0 auto' }}>
 
-        {/* MONTH TABS */}
-        <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
-          {MONTHS.map((mo,i) => (
-            <button key={i} onClick={()=>switchMonth(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
-              {mo.label}
-            </button>
-          ))}
+        <div style={{ marginBottom:'16px' }}>
+          <select
+            value={monthIdx}
+            onChange={e => switchMonth(Number(e.target.value))}
+            style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
+          >
+            {MONTHS.map((mo, i) => (
+              <option key={i} value={i}>{mo.label}</option>
+            ))}
+          </select>
         </div>
 
-        {/* STATYSTYKI */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'12px', marginBottom:'16px' }}>
           {[
             { label:'Dni w grafiku', value: shiftDays, bg:'#0a6e8a', icon:'🗓' },
@@ -135,11 +124,9 @@ export default function PanelPage() {
           ))}
         </div>
 
-        {/* KALENDARZ */}
         <div style={{ background:'white', borderRadius:'22px', padding:'24px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
           <h3 style={{ margin:'0 0 16px', color:'#064d61', fontSize:'17px' }}>{m.label}</h3>
 
-          {/* LEGENDA */}
           <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', marginBottom:'16px', fontSize:'12px' }}>
             <span style={{ display:'flex', alignItems:'center', gap:'5px' }}>
               <span style={{ width:14, height:14, borderRadius:3, background:'#0a6e8a', display:'inline-block' }}/> W grafiku
@@ -151,18 +138,18 @@ export default function PanelPage() {
               <span style={{ width:14, height:14, borderRadius:3, background:'#f5a623', display:'inline-block' }}/> Weekend dostępny
             </span>
             <span style={{ display:'flex', alignItems:'center', gap:'5px' }}>
-              <span style={{ width:14, height:14, borderRadius:3, background:'#d5f5e3', border:'2px solid #2d9e6b', display:'inline-block' }}/> ✅ Obecny
+              <span style={{ width:14, height:14, borderRadius:3, background:'#2d9e6b', display:'inline-block' }}/> Obecny
             </span>
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'4px', marginBottom:'8px' }}>
-            {PL_DAYS.map((d,i) => (
+            {PL_DAYS_HEADER.map((d,i) => (
               <div key={i} style={{ textAlign:'center', fontSize:'11px', fontWeight:700, color: i>=5?'#f5a623':'#6b8a95', padding:'6px 0' }}>{d}</div>
             ))}
           </div>
 
           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'6px' }}>
-            {Array.from({ length: MONTH_START_DAYS[monthIdx] }, (_,i) => <div key={`e${i}`}/>)}
+            {Array.from({ length: getMonthStartOffset(monthIdx) }, (_,i) => <div key={`e${i}`}/>)}
             {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
               const we = isWeekend(monthIdx, day)
               const hasShift = !!shifts[day]
@@ -170,6 +157,8 @@ export default function PanelPage() {
               const att = attendance[day]
               const isPresent = att?.status === 'obecny'
               const sh = shifts[day]
+              const dow = getDow(monthIdx, day)
+              const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
 
               let bg = we ? '#fff8ec' : '#fafcfd'
               let border = `2px solid ${we ? '#fdd68a' : '#ddeaf0'}`
@@ -182,15 +171,12 @@ export default function PanelPage() {
 
               return (
                 <div key={day} style={{
-                  aspectRatio:'1', borderRadius:'10px', border,
-                  background: bg, padding:'4px 2px',
+                  aspectRatio:'1', borderRadius:'10px', border, background: bg, padding:'4px 2px',
                   display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'1px',
                   position:'relative'
                 }}>
                   <span style={{ fontWeight:700, fontSize:'13px', color:textColor, lineHeight:1 }}>{day}</span>
-                  <span style={{ fontSize:'7px', color: textColor==='white'?'rgba(255,255,255,0.8)':textColor }}>
-                    {PL_DAYS[getDow(monthIdx,day)]}
-                  </span>
+                  <span style={{ fontSize:'7px', color: textColor==='white'?'rgba(255,255,255,0.8)':textColor }}>{dowLabel}</span>
                   {hasShift && sh && (
                     <span style={{ fontSize:'6px', color:'rgba(255,255,255,0.9)', fontWeight:600, lineHeight:1 }}>
                       {sh.start_time?.slice(0,5)}
@@ -205,7 +191,6 @@ export default function PanelPage() {
           </div>
         </div>
 
-        {/* NAJBLIŻSZE ZMIANY */}
         {Object.keys(shifts).length > 0 && (
           <div style={{ background:'white', borderRadius:'22px', padding:'24px', marginTop:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
             <h3 style={{ margin:'0 0 16px', color:'#064d61', fontSize:'17px' }}>🗓 Moje zmiany – {m.label}</h3>
@@ -213,12 +198,13 @@ export default function PanelPage() {
               {Object.entries(shifts).sort((a,b) => Number(a[0])-Number(b[0])).map(([day, sh]) => {
                 const att = attendance[Number(day)]
                 const dow = getDow(monthIdx, Number(day))
-                const we = dow >= 5
+                const we = dow === 0 || dow === 6
+                const dowLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
                 return (
                   <div key={day} style={{ background:'#fafcfd', borderRadius:'12px', padding:'14px 16px', border:`2px solid ${we?'#fdd68a':'#ddeaf0'}`, display:'flex', alignItems:'center', gap:'12px' }}>
                     <div style={{ width:'44px', height:'44px', borderRadius:'10px', background: we?'#f5a623':'#0a6e8a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', color:'white', flexShrink:0 }}>
                       <span style={{ fontWeight:800, fontSize:'16px', lineHeight:1 }}>{day}</span>
-                      <span style={{ fontSize:'9px', opacity:0.85 }}>{PL_DAYS[dow]}</span>
+                      <span style={{ fontSize:'9px', opacity:0.85 }}>{dowLabel}</span>
                     </div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontWeight:700, fontSize:'14px', color:'#064d61' }}>{sh.stanowisko}</div>
@@ -239,7 +225,6 @@ export default function PanelPage() {
           </div>
         )}
 
-        {/* SZYBKIE AKCJE */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginTop:'16px' }}>
           <button onClick={()=>router.push('/availability')} style={{ background:'white', border:'2px solid #ddeaf0', borderRadius:'16px', padding:'20px', cursor:'pointer', textAlign:'left' as const }}>
             <div style={{ fontSize:'24px', marginBottom:'8px' }}>📅</div>
