@@ -5,16 +5,19 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Profile, MONTHS } from '@/lib/types'
 
-const PL_DAYS = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
-const MONTH_START_DAYS = [0, 2, 5]
+const PL_DAYS = ['Nd','Pn','Wt','Śr','Cz','Pt','So']
 const HOURS = ['06:00','06:30','07:00','07:30','08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30','19:00','19:30','20:00','20:30','21:00','21:30','22:00']
 
 function getDow(mi: number, day: number) {
-  return (MONTH_START_DAYS[mi] + day - 1) % 7
+  const m = MONTHS[mi]
+  return new Date(m.year, m.month - 1, day).getDay()
 }
 function isWeekend(mi: number, day: number) {
-  const d = getDow(mi, day); return d === 5 || d === 6
+  const d = getDow(mi, day)
+  return d === 0 || d === 6
 }
+
+type BusinessHour = { day_of_week: number, open_time: string, close_time: string, is_open: boolean }
 
 export default function SchedulePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -33,6 +36,7 @@ export default function SchedulePage() {
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState<any>(null)
   const [stanowiska, setStanowiska] = useState<string[]>([])
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([])
   const router = useRouter()
   const supabase = createClient()
 
@@ -44,11 +48,20 @@ export default function SchedulePage() {
       setProfile(prof)
       setIsAdmin(prof?.role === 'administrator' || prof?.role === 'koordynator')
       if (prof?.role === 'pracownik') { router.push('/panel'); return }
+      const { data: bh } = await supabase.from('business_hours').select('*')
+      setBusinessHours(bh || [])
       await loadData(0)
       setLoading(false)
     }
     load()
   }, [])
+
+  function getBusinessHours(mi: number, day: number): string {
+    const dow = getDow(mi, day)
+    const bh = businessHours.find(h => h.day_of_week === dow)
+    if (!bh || !bh.is_open) return '✓'
+    return `${bh.open_time.slice(0,5)}-${bh.close_time.slice(0,5)}`
+  }
 
   async function loadData(mi: number) {
     const m = MONTHS[mi]
@@ -83,12 +96,15 @@ export default function SchedulePage() {
     if (!isAdmin) return
     const existing = shifts[workerId]?.[day]
     const avail = availability[workerId]?.[day]
+    const we = isWeekend(monthIdx, day)
+    const dow = getDow(monthIdx, day)
+    const bh = businessHours.find(h => h.day_of_week === dow)
     const defaultFrom = avail?.all_day === false && avail?.from_time
       ? avail.from_time.slice(0,5)
-      : (isWeekend(monthIdx, day) ? '08:00' : '10:00')
+      : (bh?.open_time?.slice(0,5) || (we ? '08:00' : '10:00'))
     const defaultTo = avail?.all_day === false && avail?.to_time
       ? avail.to_time.slice(0,5)
-      : '18:00'
+      : (bh?.close_time?.slice(0,5) || '18:00')
     setPopupFrom(existing?.start_time?.slice(0,5) || defaultFrom)
     setPopupTo(existing?.end_time?.slice(0,5) || defaultTo)
     const w = workers.find(w => w.id === workerId)
@@ -140,6 +156,7 @@ export default function SchedulePage() {
   })
 
   const m = MONTHS[monthIdx]
+  const PL_DAYS_HEADER = ['Pn','Wt','Śr','Cz','Pt','So','Nd']
 
   if (loading) return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(180deg,#0a6e8a 0%,#7dd3e8 100%)', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'18px', fontFamily:'Arial' }}>Ładowanie...</div>
@@ -231,19 +248,23 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div style={{ display:'flex', gap:'8px', marginBottom:'16px', flexWrap:'wrap' }}>
-          {MONTHS.map((mo,i) => (
-            <button key={i} onClick={()=>switchMonth(i)} style={{ padding:'10px 20px', borderRadius:'100px', border:'1.5px solid rgba(255,255,255,0.3)', background: monthIdx===i?'white':'rgba(255,255,255,0.15)', color: monthIdx===i?'#064d61':'white', fontWeight:600, fontSize:'13px', cursor:'pointer' }}>
-              {mo.label}
-            </button>
-          ))}
+        <div style={{ marginBottom:'16px' }}>
+          <select
+            value={monthIdx}
+            onChange={e => switchMonth(Number(e.target.value))}
+            style={{ padding:'12px 20px', borderRadius:'12px', border:'2px solid rgba(255,255,255,0.4)', background:'white', color:'#064d61', fontWeight:600, fontSize:'14px', cursor:'pointer', outline:'none', width:'100%', maxWidth:'300px' }}
+          >
+            {MONTHS.map((mo, i) => (
+              <option key={i} value={i}>{mo.label}</option>
+            ))}
+          </select>
         </div>
 
         <div style={{ display:'flex', gap:'12px', flexWrap:'wrap', marginBottom:'16px', fontSize:'12px' }}>
           {[
             { bg:'#0a6e8a', label:'Zmiana przypisana' },
-            { bg:'#eef4fb', label:'Dostępny', border:'1px solid #1a9bb8' },
-            { bg:'#fdd68a', label:'Weekend dostępny', border:'1px solid #f5a623' },
+            { bg:'#eef4fb', label:'Dostępny (dzień roboczy)', border:'1px solid #1a9bb8' },
+            { bg:'#fdd68a', label:'Dostępny (weekend)', border:'1px solid #f5a623' },
             { bg:'#f0f4f8', label:'Niedostępny' },
           ].map((l,i) => (
             <span key={i} style={{ display:'flex', alignItems:'center', gap:'5px', color:'white' }}>
@@ -260,13 +281,14 @@ export default function SchedulePage() {
                 <th style={{ padding:'12px 16px', background:'#064d61', color:'white', textAlign:'left', fontSize:'13px', fontWeight:600, position:'sticky', left:0, zIndex:2, minWidth:'160px' }}>Pracownik</th>
                 {Array.from({ length: m.days }, (_,i) => i+1).map(day => {
                   const dow = getDow(monthIdx, day)
-                  const we = dow >= 5
+                  const we = dow === 0 || dow === 6
                   const isSel = selectedDay === day
+                  const dayLabel = PL_DAYS_HEADER[dow === 0 ? 6 : dow - 1]
                   return (
                     <th key={day} onClick={() => setSelectedDay(isSel ? null : day)}
                       style={{ padding:'6px 2px', background: isSel?'#1a9bb8':(we?'#b87a00':'#064d61'), color:'white', textAlign:'center', fontSize:'10px', fontWeight:600, cursor:'pointer', minWidth:'42px' }}>
                       <div style={{ fontWeight:700 }}>{day}</div>
-                      <div style={{ fontSize:'8px', opacity:0.8 }}>{PL_DAYS[dow]}</div>
+                      <div style={{ fontSize:'8px', opacity:0.8 }}>{dayLabel}</div>
                     </th>
                   )
                 })}
@@ -291,25 +313,43 @@ export default function SchedulePage() {
                         const hasShift = !!shifts[w.id]?.[day]
                         const hasAvail = !!availability[w.id]?.[day]
                         const sh = shifts[w.id]?.[day]
+                        const av = availability[w.id]?.[day]
                         const isSel = selectedDay === day
+
                         let bg = we ? '#fff8ec' : (wi%2===0?'white':'#fafcfd')
                         let color = we ? '#c8a400' : '#ccc'
                         let content = ''
                         let fontSize = '9px'
+
                         if (hasAvail && !hasShift) {
-                          const av = availability[w.id]?.[day]
-                          bg = we?'#fdd68a':'#eef4fb'
-                          color = we?'#7a5c00':'#0a6e8a'
+                          if (we) {
+                            bg = '#fdd68a'
+                            color = '#7a5c00'
+                          } else {
+                            bg = '#eef4fb'
+                            color = '#0a6e8a'
+                          }
                           if (av?.all_day === false && av?.from_time) {
                             content = `${av.from_time.slice(0,5)}-${av.to_time?.slice(0,5)}`
                             fontSize = '8px'
                           } else {
-                            content = '✓'
-                            fontSize = '12px'
+                            // cały dzień - pokaż godziny firmy
+                            content = getBusinessHours(monthIdx, day)
+                            fontSize = content === '✓' ? '12px' : '8px'
                           }
                         }
-                        if (hasShift) { bg = '#0a6e8a'; color = 'white'; content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`; fontSize = '8px' }
-                        if (isSel) { bg = hasShift ? '#064d61' : (hasAvail ? (we?'#f5a623':'#1a9bb8') : (we?'#fdd68a':'#e8f0f8')) }
+
+                        if (hasShift) {
+                          bg = '#0a6e8a'
+                          color = 'white'
+                          content = `${sh.start_time?.slice(0,5)}-${sh.end_time?.slice(0,5)}`
+                          fontSize = '8px'
+                        }
+
+                        if (isSel) {
+                          bg = hasShift ? '#064d61' : (hasAvail ? (we?'#f5a623':'#1a9bb8') : (we?'#fdd68a':'#e8f0f8'))
+                        }
+
                         return (
                           <td key={day} onClick={() => isAdmin && openPopup(w.id, day)}
                             style={{ padding:'3px 2px', borderBottom:'1px solid #f0f4f8', textAlign:'center', cursor: isAdmin?'pointer':'default' }}>
@@ -329,7 +369,9 @@ export default function SchedulePage() {
 
         {selectedDay && (
           <div style={{ background:'white', borderRadius:'22px', padding:'20px', marginTop:'16px', boxShadow:'0 6px 30px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ margin:'0 0 14px', color:'#064d61', fontSize:'16px' }}>📋 {selectedDay} {m.label} – {PL_DAYS[getDow(monthIdx, selectedDay)]}</h3>
+            <h3 style={{ margin:'0 0 14px', color:'#064d61', fontSize:'16px' }}>
+              📋 {selectedDay} {m.label} – {PL_DAYS_HEADER[getDow(monthIdx, selectedDay) === 0 ? 6 : getDow(monthIdx, selectedDay) - 1]}
+            </h3>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
               <div>
                 <p style={{ margin:'0 0 8px', fontSize:'13px', fontWeight:700, color:'#2d9e6b' }}>✅ W grafiku ({workers.filter(w => shifts[w.id]?.[selectedDay]).length})</p>
@@ -346,7 +388,7 @@ export default function SchedulePage() {
                   const avail = availability[w.id]?.[selectedDay]
                   const hours = avail?.all_day === false && avail?.from_time
                     ? `${avail.from_time.slice(0,5)}–${avail.to_time?.slice(0,5)}`
-                    : 'cały dzień'
+                    : getBusinessHours(monthIdx, selectedDay)
                   return (
                     <div key={w.id} style={{ fontSize:'13px', color:'#6b8a95', marginBottom:'4px', display:'flex', justifyContent:'space-between' }}>
                       <span>{w.first_name} {w.last_name} · {w.stanowisko || '—'}</span>
